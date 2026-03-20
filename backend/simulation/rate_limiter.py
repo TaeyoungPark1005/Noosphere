@@ -1,19 +1,16 @@
 """
-Redis-based global rate limiter for Anthropic API calls.
+Redis-based global rate limiter for OpenAI API calls.
 
 Enforces a sliding-window RPM limit shared across ALL Celery workers,
-preventing 429 errors from the Haiku 4.5 Tier-1 limits:
-  - 50 RPM  (hard limit)
-  - 50,000 ITPM (input tokens/min — binding constraint in practice)
-  - 10,000 OTPM
+preventing 429 errors from the OpenAI Tier-1 limits:
+  - 500 RPM  (hard limit)
+  - TPM limit varies by model (no separate ITPM — just TPM)
 
-We target 20 RPM (40% of 50). Each call averages ~1,800-2,000 input tokens
-(system + tool schema + feed context), so 20 RPM × 2,000 tokens ≈ 40,000 ITPM,
-leaving a safe buffer under the 50K ITPM ceiling.
+We target 400 RPM (80% of 500), leaving a safe buffer under the ceiling.
 
 Override via env:
-  ANTHROPIC_HAIKU_RPM=50   # your tier's actual limit
-  ANTHROPIC_RPM_SAFETY=0.40  # fraction to actually use
+  OPENAI_RPM=500        # your tier's actual limit
+  OPENAI_RPM_SAFETY=0.80  # fraction to actually use
 """
 from __future__ import annotations
 import asyncio
@@ -22,11 +19,11 @@ import time
 import uuid
 
 # ── 설정 ──────────────────────────────────────────────────────────────────
-_TIER_RPM = int(os.getenv("ANTHROPIC_HAIKU_RPM", "50"))
-_SAFETY   = float(os.getenv("ANTHROPIC_RPM_SAFETY", "0.40"))
-_EFFECTIVE_RPM = max(1, int(_TIER_RPM * _SAFETY))  # default: 20
+_TIER_RPM = int(os.getenv("OPENAI_RPM", "500"))
+_SAFETY   = float(os.getenv("OPENAI_RPM_SAFETY", "0.80"))
+_EFFECTIVE_RPM = max(1, int(_TIER_RPM * _SAFETY))  # default: 400
 
-_REDIS_KEY = "noosphere:anthropic:rpm"
+_REDIS_KEY = "noosphere:openai:rpm"
 
 # ── Redis 클라이언트 (지연 초기화) ─────────────────────────────────────────
 _redis_client = None

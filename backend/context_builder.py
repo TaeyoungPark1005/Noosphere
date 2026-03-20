@@ -5,37 +5,34 @@ import os
 import re
 import uuid
 
-import anthropic
+import openai
 import httpx
 
 logger = logging.getLogger(__name__)
 
-_client: anthropic.AsyncAnthropic | None = None
+_client: openai.AsyncOpenAI | None = None
 
 
-def _get_client() -> anthropic.AsyncAnthropic:
+def _get_client() -> openai.AsyncOpenAI:
     global _client
     if _client is None:
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY not set")
-        _client = anthropic.AsyncAnthropic(api_key=api_key, timeout=30.0)
+        _client = openai.AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""), timeout=30.0)
     return _client
 
 
 async def extract_concepts_from_text(text: str) -> list[str]:
-    """Use Claude to extract key concepts/entities from product description."""
+    """Use OpenAI to extract key concepts/entities from product description."""
     prompt = (
         f"Extract 5-10 key concepts, technologies, or market categories from this "
         f"product description. Return ONLY a JSON array of strings.\n\n{text[:2000]}"
     )
     client = _get_client()
-    msg = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
+    response = await client.chat.completions.create(
+        model="gpt-5.4-nano",
         max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
     )
-    raw = msg.content[0].text.strip()
+    raw = response.choices[0].message.content.strip()
     raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.DOTALL).strip()
     try:
         concepts = json.loads(raw)
@@ -127,11 +124,11 @@ async def detect_domain(input_text: str) -> str:
     )
     client = _get_client()
     try:
-        msg = await client.messages.create(
-            model="claude-haiku-4-5-20251001",
+        response = await client.chat.completions.create(
+            model="gpt-5.4-nano",
             max_tokens=32,
             messages=[{"role": "user", "content": prompt}],
         )
-        return msg.content[0].text.strip()[:50]
+        return response.choices[0].message.content.strip()[:50]
     except Exception:
         return "technology"
