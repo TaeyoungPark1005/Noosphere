@@ -24,13 +24,13 @@ Paste your landing page, pitch deck, or product description and Noosphere will:
 - Run multi-round social simulations across 5 tech platforms
 - Deliver a structured analysis: verdict, sentiment by segment, key criticisms`
 
-const PLATFORM_LABELS: Record<Platform, string> = {
-  hackernews:      'Hacker News',
-  producthunt:     'Product Hunt',
-  indiehackers:    'Indie Hackers',
-  reddit_startups: 'Reddit r/startups',
-  linkedin:        'LinkedIn',
-}
+const PLATFORM_OPTIONS: Array<{ id: Platform; label: string; icon: string }> = [
+  { id: 'hackernews',      label: 'Hacker News',      icon: '🟠' },
+  { id: 'producthunt',     label: 'Product Hunt',     icon: '🔴' },
+  { id: 'indiehackers',   label: 'Indie Hackers',    icon: '🟣' },
+  { id: 'reddit_startups', label: 'Reddit r/startups', icon: '🟤' },
+  { id: 'linkedin',        label: 'LinkedIn',          icon: '🔵' },
+]
 
 const SENTIMENT_COLOR: Record<string, string> = {
   positive: '#22c55e',
@@ -45,44 +45,55 @@ type ResultTab = 'report' | 'feed' | 'analysis'
 
 function HomePhase({ displayText, runClicked }: { displayText: string; runClicked: boolean }) {
   return (
-    <div style={{ padding: '28px 28px 24px' }}>
-      <h2 style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.03em', margin: '0 0 7px', color: '#0f172a' }}>
-        How will the market react?
-      </h2>
-      <p style={{ color: '#64748b', fontSize: 12, margin: '0 0 14px' }}>
-        Describe your product and simulate real-world reactions across tech communities.
-      </p>
+    <div style={{ padding: '32px 28px 24px', textAlign: 'left' }}>
+      <div style={{ marginBottom: 20 }}>
+        <h2 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.04em', margin: '0 0 8px', color: '#1e293b' }}>
+          How will the market react?
+        </h2>
+        <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>
+          Describe your product and simulate real-world reactions across tech communities.
+        </p>
+      </div>
+
+      {/* Textarea — matches real app (focused state with purple border) */}
       <div style={{
-        width: '100%', padding: '11px 13px',
-        fontSize: 11.5, border: '1.5px solid #8b5cf6',
-        borderRadius: 9, background: '#fff',
+        width: '100%', padding: '14px 16px',
+        fontSize: 13, border: '1.5px solid #8b5cf6',
+        borderRadius: 12, background: '#fff',
         fontFamily: 'inherit', lineHeight: 1.6,
         color: '#1e293b',
-        boxShadow: '0 0 0 3px rgba(139,92,246,0.1)',
-        minHeight: 110, whiteSpace: 'pre-wrap',
+        boxShadow: '0 0 0 3px rgba(139,92,246,0.12)',
+        minHeight: 108, whiteSpace: 'pre-wrap',
         wordBreak: 'break-word',
+        boxSizing: 'border-box' as const,
       }}>
         {displayText}
         {displayText.length < DEMO_INPUT.length && (
           <span className="cursor-blink" style={{ display: 'inline' }} />
         )}
       </div>
-      <div style={{ marginTop: 11, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-        {(Object.keys(PLATFORM_LABELS) as Platform[]).map(p => (
-          <span key={p} style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '4px 10px', fontSize: 11, borderRadius: 7,
+
+      {/* Platform buttons — exact match with real app */}
+      <div style={{ marginTop: 14, display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+        {PLATFORM_OPTIONS.map(p => (
+          <span key={p.id} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '7px 14px', fontSize: 13, borderRadius: 8,
             border: '1.5px solid #1e293b',
             background: '#1e293b', color: '#fff', fontWeight: 600,
+            boxShadow: '0 2px 8px rgba(30,41,59,0.25)',
           }}>
-            {PLATFORM_LABELS[p]}
+            <span>{p.icon}</span> {p.label}
           </span>
         ))}
       </div>
+
+      {/* Run button — exact match with real app */}
       <div style={{
-        marginTop: 14, padding: '10px 22px', fontSize: 12, fontWeight: 700,
+        marginTop: 18,
+        padding: '12px 32px', fontSize: 14, fontWeight: 700,
         background: '#1e293b', color: '#fff',
-        border: 'none', borderRadius: 8, display: 'inline-block',
+        borderRadius: 10, display: 'inline-block',
         letterSpacing: '-0.01em',
         animation: runClicked ? 'runClick 200ms ease forwards' : 'none',
       }}>
@@ -476,7 +487,7 @@ export function LandingDemoWindow() {
 
       {/* Content area — fixed height, clipped */}
       <div style={{
-        height: 420,
+        height: 460,
         overflow: 'hidden',
         opacity: visible ? 1 : 0,
         transition: 'opacity 0.3s ease',
