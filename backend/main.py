@@ -17,7 +17,8 @@ from pydantic import BaseModel, field_validator
 from backend.celery_app import REDIS_URL
 from backend.db import (
     init_db, create_simulation, update_simulation_status,
-    save_sim_results, get_sim_results, list_history, get_simulation, DB_PATH,
+    get_sim_results, list_history, get_simulation, DB_PATH,
+    count_active_simulations, reconcile_stale_simulations, request_simulation_cancel,
 )
 from backend.tasks import run_simulation_task, STREAM_KEY
 
@@ -25,17 +26,20 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 MAX_JOBS = int(os.getenv("MAX_JOBS", "5"))
+SIM_QUEUE_TIMEOUT_SECONDS = int(os.getenv("SIM_QUEUE_TIMEOUT_SECONDS", "900"))
+SIM_HEARTBEAT_TIMEOUT_SECONDS = int(os.getenv("SIM_HEARTBEAT_TIMEOUT_SECONDS", "90"))
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db(DB_PATH)
-    # 서버 재시작 시 미완료 작업을 failed로 정리
-    import sqlite3 as _sqlite3
-    with _sqlite3.connect(str(DB_PATH)) as _conn:
-        cur = _conn.execute("UPDATE simulations SET status='failed' WHERE status='running'")
-        if cur.rowcount:
-            logger.info("Marked %d stale 'running' simulations as 'failed'", cur.rowcount)
+    stale_count = reconcile_stale_simulations(
+        DB_PATH,
+        queue_timeout_seconds=SIM_QUEUE_TIMEOUT_SECONDS,
+        heartbeat_timeout_seconds=SIM_HEARTBEAT_TIMEOUT_SECONDS,
+    )
+    if stale_count:
+        logger.info("Marked %d stale simulations as failed", stale_count)
     yield
 
 
@@ -56,6 +60,7 @@ class SimConfig(BaseModel):
     platforms: list[str] = ["hackernews", "producthunt", "indiehackers", "reddit_startups", "linkedin"]
     activation_rate: float = 0.25
     source_limits: dict[str, int] = {}
+    provider: str = "openai"
 
     @field_validator("input_text")
     @classmethod
@@ -81,6 +86,13 @@ class SimConfig(BaseModel):
     def agents_valid(cls, v: int) -> int:
         return max(1, min(v, 150))
 
+    @field_validator("provider")
+    @classmethod
+    def provider_valid(cls, v: str) -> str:
+        if v not in {"openai", "anthropic", "gemini"}:
+            raise ValueError("provider must be openai, anthropic, or gemini")
+        return v
+
 
 @app.get("/health")
 async def health():
@@ -90,12 +102,16 @@ async def health():
 @app.post("/simulate")
 async def simulate(config: SimConfig):
     """Start a simulation via Celery worker. Returns sim_id for streaming."""
-    # 현재 running 중인 시뮬레이션 수 체크
-    import sqlite3 as _sqlite3
-    with _sqlite3.connect(str(DB_PATH)) as _conn:
-        (running_count,) = _conn.execute(
-            "SELECT COUNT(*) FROM simulations WHERE status='running'"
-        ).fetchone()
+    reconcile_stale_simulations(
+        DB_PATH,
+        queue_timeout_seconds=SIM_QUEUE_TIMEOUT_SECONDS,
+        heartbeat_timeout_seconds=SIM_HEARTBEAT_TIMEOUT_SECONDS,
+    )
+    running_count = count_active_simulations(
+        DB_PATH,
+        queue_timeout_seconds=SIM_QUEUE_TIMEOUT_SECONDS,
+        heartbeat_timeout_seconds=SIM_HEARTBEAT_TIMEOUT_SECONDS,
+    )
     if running_count >= MAX_JOBS:
         raise HTTPException(429, "Too many concurrent simulations")
 
@@ -103,7 +119,11 @@ async def simulate(config: SimConfig):
     create_simulation(DB_PATH, sim_id, config.input_text, config.language,
                       config.model_dump(), "")
 
-    run_simulation_task.apply_async(args=[sim_id, config.model_dump()], task_id=sim_id)
+    try:
+        run_simulation_task.apply_async(args=[sim_id, config.model_dump()], task_id=sim_id)
+    except Exception:
+        update_simulation_status(DB_PATH, sim_id, "failed", allowed_current_statuses={"running"})
+        raise
     return {"sim_id": sim_id}
 
 
@@ -158,19 +178,22 @@ async def history():
 
 @app.post("/simulate/{sim_id}/cancel")
 async def cancel_simulation(sim_id: str):
-    """Cancel a running simulation: revoke Celery task + mark DB as failed."""
+    """Cancel a running simulation: mark DB cancelled first, then revoke worker task."""
     sim = get_simulation(DB_PATH, sim_id)
     if not sim:
         raise HTTPException(404, "Simulation not found")
     if sim["status"] != "running":
         raise HTTPException(400, f"Simulation is not running (status: {sim['status']})")
 
-    # Celery task revoke (terminate=True sends SIGTERM to worker process)
-    from backend.celery_app import celery_app as _celery
-    _celery.control.revoke(sim_id, terminate=True, signal="SIGTERM")
+    if not request_simulation_cancel(DB_PATH, sim_id):
+        raise HTTPException(409, "Simulation state changed before cancellation")
 
-    # DB 상태 업데이트
-    update_simulation_status(DB_PATH, sim_id, "failed")
+    # Celery task revoke (terminate=True sends SIGTERM to the worker child in prefork pools)
+    from backend.celery_app import celery_app as _celery
+    try:
+        _celery.control.revoke(sim_id, terminate=True, signal="SIGTERM")
+    except Exception:
+        logger.exception("Failed to revoke simulation %s; relying on cooperative cancellation", sim_id)
 
     # Redis stream에 종료 이벤트 발행 (SSE 클라이언트가 연결 끊도록)
     r = aioredis.from_url(REDIS_URL, decode_responses=True)
