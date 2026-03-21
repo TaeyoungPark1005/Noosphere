@@ -72,10 +72,15 @@ async def build_ontology(
         raw_entities = parsed.get("entities", [])
         if not isinstance(raw_entities, list):
             raw_entities = []
+        # Filter out entities missing required name/type before ID assignment
+        raw_entities = [
+            e for e in raw_entities
+            if isinstance(e, dict) and isinstance(e.get("name"), str) and isinstance(e.get("type"), str)
+        ]
         entities = _assign_ids(raw_entities)
 
         # Resolve relationship from_name/to_name → entity IDs
-        name_to_id = {e["name"].lower(): e["id"] for e in entities if isinstance(e.get("name"), str)}
+        name_to_id = {e["name"].lower(): e["id"] for e in entities}
         relationships = []
         for rel in parsed.get("relationships", []):
             if not isinstance(rel, dict):
@@ -111,7 +116,7 @@ def _assign_source_node_ids(entities: list[dict], context_nodes: list[dict]) -> 
     """
     result = []
     for entity in entities:
-        name_lower = entity["name"].lower()
+        name_lower = (entity.get("name") or "").lower()
         matched = [
             n["id"] for n in context_nodes
             if name_lower in n.get("title", "").lower()
@@ -126,7 +131,7 @@ def ontology_for_persona(ontology: dict) -> str:
     """max 400 chars — domain_summary + top 8 entity names + market_tensions."""
     domain = ontology.get("domain_summary", "")
     names = ", ".join(
-        f"{e['name']} ({e['type']})"
+        f"{e.get('name', '')} ({e.get('type', '')})"
         for e in ontology.get("entities", [])[:8]
     )
     tensions = "; ".join(ontology.get("market_tensions", [])[:3])
@@ -139,7 +144,7 @@ def ontology_for_persona(ontology: dict) -> str:
 def ontology_for_action(ontology: dict) -> str:
     """max 200 chars — domain_summary + top 5 entity names only."""
     domain = ontology.get("domain_summary", "")
-    names = ", ".join(e["name"] for e in ontology.get("entities", [])[:5])
+    names = ", ".join(e.get("name", "") for e in ontology.get("entities", [])[:5])
     text = f"Domain: {domain}\nPlayers: {names}"
     return text[:200]
 
@@ -147,10 +152,10 @@ def ontology_for_action(ontology: dict) -> str:
 def ontology_for_content(ontology: dict) -> str:
     """max 600 chars — entity name list + relationship summary."""
     names = ", ".join(
-        f"{e['name']} ({e['type']})"
+        f"{e.get('name', '')} ({e.get('type', '')})"
         for e in ontology.get("entities", [])
     )
-    id_to_name = {e["id"]: e["name"] for e in ontology.get("entities", [])}
+    id_to_name = {e["id"]: e.get("name", "") for e in ontology.get("entities", [])}
     rels = "\n".join(
         f"- {id_to_name.get(r['from'], r['from'])} {r['type']} {id_to_name.get(r['to'], r['to'])}"
         for r in ontology.get("relationships", [])[:10]
