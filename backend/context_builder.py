@@ -21,7 +21,7 @@ async def extract_concepts_from_text(text: str, provider: str = "openai") -> lis
         messages=[{"role": "user", "content": prompt}],
         tier="low",
         provider=provider,
-        max_tokens=512,
+        max_tokens=2048,
     )
     raw = (response.content or "").strip()
     if not raw:
@@ -122,7 +122,7 @@ async def detect_domain(input_text: str, provider: str = "openai") -> str:
             messages=[{"role": "user", "content": prompt}],
             tier="low",
             provider=provider,
-            max_tokens=32,
+            max_tokens=512,
         )
         return (response.content or "").strip()[:50] or "technology"
     except Exception:

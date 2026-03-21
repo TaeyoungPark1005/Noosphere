@@ -17,9 +17,22 @@ logger = logging.getLogger(__name__)
 LLMTier = Literal["high", "mid", "low"]
 
 _MODELS: dict[str, dict[str, str]] = {
-    "openai":    {"high": "gpt-5.4",          "mid": "gpt-5.4-mini",       "low": "gpt-5.4-nano"},
-    "anthropic": {"high": "claude-opus-4-6",   "mid": "claude-sonnet-4-6",  "low": "claude-haiku-4-5-20251001"},
-    "gemini":    {"high": "gemini-2.5-pro",    "mid": "gemini-2.0-flash",   "low": "gemini-2.0-flash-lite"},
+    "openai":    {"high": "gpt-5.4",        "mid": "gpt-5.4-mini",       "low": "gpt-5.4-nano"},
+    "anthropic": {"high": "claude-opus-4-6", "mid": "claude-sonnet-4-6",  "low": "claude-haiku-4-5-20251001"},
+    "gemini":    {"high": "gemini-2.5-pro",  "mid": "gemini-2.5-flash",   "low": "gemini-2.5-flash-lite"},
+}
+
+# Maximum output tokens per model
+_MODEL_MAX_TOKENS: dict[str, int] = {
+    "gpt-5.4":                    32768,
+    "gpt-5.4-mini":               16384,
+    "gpt-5.4-nano":                8192,
+    "claude-opus-4-6":           128000,
+    "claude-sonnet-4-6":          64000,
+    "claude-haiku-4-5-20251001":   8192,
+    "gemini-2.5-pro":             65536,
+    "gemini-2.5-flash":           32768,
+    "gemini-2.5-flash-lite":      16384,
 }
 
 _API_KEY_NAMES: dict[str, str] = {
@@ -65,6 +78,9 @@ async def complete(
     """Route LLM call to the appropriate provider."""
     check_provider_key(provider)
     model = _MODELS[provider][tier]
+    model_max = _MODEL_MAX_TOKENS.get(model)
+    if model_max is not None:
+        max_tokens = min(max_tokens, model_max)
 
     if provider == "openai":
         return await _complete_openai(messages, model, max_tokens, timeout, tools, tool_choice)
@@ -116,7 +132,7 @@ async def _complete_openai(
     tool_choice: str | None,
 ) -> LLMResponse:
     client = _get_openai_client()
-    kwargs: dict = {"model": model, "max_tokens": max_tokens, "messages": messages}
+    kwargs: dict = {"model": model, "max_completion_tokens": max_tokens, "messages": messages}
     if tools:
         kwargs["tools"] = tools
         kwargs["tool_choice"] = _tool_choice_openai(tool_choice)
@@ -220,6 +236,7 @@ async def _complete_anthropic(
         kwargs["tool_choice"] = _tool_choice_anthropic(tool_choice)
 
     for attempt in range(4):
+        await acquire_api_slot("anthropic")
         try:
             response = await asyncio.wait_for(
                 client.messages.create(**kwargs),
@@ -365,6 +382,7 @@ async def _complete_gemini(
     )
 
     for attempt in range(4):
+        await acquire_api_slot("gemini")
         try:
             response = await asyncio.wait_for(
                 client.aio.models.generate_content(

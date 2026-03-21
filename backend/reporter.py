@@ -75,6 +75,6 @@ Respond entirely in {language}."""
         ],
         tier="high",
         provider=provider,
-        max_tokens=8192,
+        max_tokens=32768,
     )
     return response.content or ""

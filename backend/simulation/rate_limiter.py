@@ -1,16 +1,14 @@
 """
-Redis-based global rate limiter for OpenAI API calls.
+Redis-based global rate limiter for LLM API calls.
 
 Enforces a sliding-window RPM limit shared across ALL Celery workers,
-preventing 429 errors from the OpenAI Tier-1 limits:
-  - 500 RPM  (hard limit)
-  - TPM limit varies by model (no separate ITPM — just TPM)
-
-We target 400 RPM (80% of 500), leaving a safe buffer under the ceiling.
+preventing 429 errors. Supports all three providers independently.
 
 Override via env:
-  OPENAI_RPM=500        # your tier's actual limit
-  OPENAI_RPM_SAFETY=0.80  # fraction to actually use
+  OPENAI_RPM=500          # OpenAI tier's actual limit (default 500)
+  ANTHROPIC_RPM=50        # Anthropic tier's actual limit (default 50)
+  GEMINI_RPM=60           # Gemini tier's actual limit (default 60)
+  RPM_SAFETY=0.80         # fraction to actually use (default 0.80)
 """
 from __future__ import annotations
 import asyncio
@@ -19,11 +17,19 @@ import time
 import uuid
 
 # ── 설정 ──────────────────────────────────────────────────────────────────
-_TIER_RPM = int(os.getenv("OPENAI_RPM", "500"))
-_SAFETY   = float(os.getenv("OPENAI_RPM_SAFETY", "0.80"))
-_EFFECTIVE_RPM = max(1, int(_TIER_RPM * _SAFETY))  # default: 400
+_SAFETY = float(os.getenv("RPM_SAFETY", "0.80"))
 
-_REDIS_KEY = "noosphere:openai:rpm"
+_PROVIDER_RPM: dict[str, int] = {
+    "openai":    max(1, int(int(os.getenv("OPENAI_RPM",    "500")) * _SAFETY)),
+    "anthropic": max(1, int(int(os.getenv("ANTHROPIC_RPM",  "50")) * _SAFETY)),
+    "gemini":    max(1, int(int(os.getenv("GEMINI_RPM",     "60")) * _SAFETY)),
+}
+
+_REDIS_KEYS: dict[str, str] = {
+    "openai":    "noosphere:openai:rpm",
+    "anthropic": "noosphere:anthropic:rpm",
+    "gemini":    "noosphere:gemini:rpm",
+}
 
 # ── Redis 클라이언트 (지연 초기화) ─────────────────────────────────────────
 _redis_client = None
@@ -64,13 +70,16 @@ end
 """
 
 
-async def acquire_api_slot() -> None:
+async def acquire_api_slot(provider: str = "openai") -> None:
     """
-    Rate-limit gate: Anthropic API를 호출하기 전에 이 함수를 await.
-    Redis 슬라이딩 윈도우로 전체 워커에 걸쳐 RPM을 제한.
+    Rate-limit gate: LLM API를 호출하기 전에 이 함수를 await.
+    Redis 슬라이딩 윈도우로 전체 워커에 걸쳐 프로바이더별 RPM을 제한.
     슬롯이 없으면 열릴 때까지 정밀하게 대기.
     """
     r = _get_redis()
+    redis_key = _REDIS_KEYS.get(provider, f"noosphere:{provider}:rpm")
+    limit = _PROVIDER_RPM.get(provider, 40)
+
     while True:
         now = time.time()
         window_start = now - 60.0
@@ -79,10 +88,10 @@ async def acquire_api_slot() -> None:
         result = await r.eval(
             _ACQUIRE_SCRIPT,
             1,
-            _REDIS_KEY,
+            redis_key,
             str(now),
             str(window_start),
-            str(_EFFECTIVE_RPM),
+            str(limit),
             entry_id,
         )
 
@@ -98,12 +107,15 @@ async def acquire_api_slot() -> None:
 # ── persona_generator.py의 `async with _api_sem:` 과 호환 ─────────────────
 class _RateLimitedSlot:
     """async context manager — acquire_api_slot() 을 래핑."""
+    def __init__(self, provider: str = "openai"):
+        self._provider = provider
+
     async def __aenter__(self) -> "_RateLimitedSlot":
-        await acquire_api_slot()
+        await acquire_api_slot(self._provider)
         return self
 
     async def __aexit__(self, *_) -> None:
         pass
 
 
-api_sem = _RateLimitedSlot()
+api_sem = _RateLimitedSlot("openai")

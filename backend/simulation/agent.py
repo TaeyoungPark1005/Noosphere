@@ -1,48 +1,35 @@
 # backend/simulation/agent.py
 from __future__ import annotations
 import logging
-import os
-import anthropic
+from backend import llm
 from backend.simulation.models import Persona
 from backend.simulation.graph_utils import sanitize_neighbor_titles
 
 logger = logging.getLogger(__name__)
 
-_client: anthropic.AsyncAnthropic | None = None
-
-
-def _get_client() -> anthropic.AsyncAnthropic:
-    global _client
-    if _client is None:
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if not api_key:
-            raise RuntimeError(
-                "ANTHROPIC_API_KEY environment variable is not set."
-            )
-        _client = anthropic.AsyncAnthropic(api_key=api_key, timeout=30.0)
-    return _client
-
-
 _SYSTEM = "You are roleplaying as a specific professional persona evaluating a new idea. Stay strictly in character."
 
 _REACT_TOOL = {
-    "name": "react_to_idea",
-    "description": "React to the idea as this persona, providing a score and one-sentence reaction.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "score": {
-                "type": "number",
-                "description": "Score from -1.0 (very negative) to 1.0 (very positive)",
-                "minimum": -1.0,
-                "maximum": 1.0,
+    "type": "function",
+    "function": {
+        "name": "react_to_idea",
+        "description": "React to the idea as this persona, providing a score and one-sentence reaction.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "score": {
+                    "type": "number",
+                    "description": "Score from -1.0 (very negative) to 1.0 (very positive)",
+                    "minimum": -1.0,
+                    "maximum": 1.0,
+                },
+                "text": {
+                    "type": "string",
+                    "description": "One sentence reaction written in the specified language",
+                },
             },
-            "text": {
-                "type": "string",
-                "description": "One sentence reaction written in the specified language",
-            },
+            "required": ["score", "text"],
         },
-        "required": ["score", "text"],
     },
 }
 
@@ -52,6 +39,7 @@ async def react(
     idea_text: str,
     language: str = "English",
     neighbor_titles: list[str] | None = None,
+    provider: str = "openai",
 ) -> tuple[float, str]:
     interests = persona.interests
     if isinstance(interests, str):
@@ -72,20 +60,19 @@ async def react(
     prompt += f"React in one sentence and give a score from -1.0 to 1.0. Your reaction text must be written in {language}."
 
     try:
-        message = await _get_client().messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=8192,
-            system=_SYSTEM,
+        response = await llm.complete(
+            messages=[
+                {"role": "system", "content": _SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
+            tier="low",
+            provider=provider,
+            max_tokens=512,
             tools=[_REACT_TOOL],
-            tool_choice={"type": "tool", "name": "react_to_idea"},
-            messages=[{"role": "user", "content": prompt}],
+            tool_choice="react_to_idea",
         )
 
-        tool_block = next((b for b in message.content if b.type == "tool_use"), None)
-        if tool_block is None:
-            raise ValueError("No tool_use block in react response")
-
-        data: dict = tool_block.input
+        data: dict = response.tool_args or {}
         raw_score = data.get("score", 0.0)
         if raw_score is None:
             raw_score = 0.0

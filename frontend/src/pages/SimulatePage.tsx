@@ -200,13 +200,13 @@ export function SimulatePage() {
       {sim.ontology ? (
         /* 2컬럼 레이아웃 — 온톨로지 수신 후 */
         <main className="page-enter" style={{
-          maxWidth: 1280, margin: '0 auto', padding: '32px 24px',
+          maxWidth: 1280, margin: '0 auto', padding: '16px 24px',
           display: 'flex', gap: 24, alignItems: 'flex-start',
         }}>
           {/* 좌측: Ecosystem Map (sticky) */}
           <div style={{
             width: 420, flexShrink: 0,
-            position: 'sticky', top: 24,
+            position: 'sticky', top: 8,
             animation: 'fadeInUp 0.4s ease',
           }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 10px' }}>
@@ -215,6 +215,7 @@ export function SimulatePage() {
             <OntologyGraph
               data={sim.ontology}
               contextNodes={[]}
+              width={420}
             />
           </div>
 

@@ -172,7 +172,7 @@ export function LandingPage() {
         </div>
 
         {/* Auto-playing walkthrough window */}
-        <div style={{ width: '100%', maxWidth: 760, marginBottom: -1 }}>
+        <div style={{ width: '100%', maxWidth: 900, marginBottom: 48, textAlign: 'left' }}>
           <LandingDemoWindow />
         </div>
       </section>

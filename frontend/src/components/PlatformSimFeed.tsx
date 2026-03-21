@@ -9,6 +9,7 @@ import { IndieHackersUI } from './platforms/IndieHackersUI'
 interface Props {
   postsByPlatform: Partial<Record<Platform, SocialPost[]>>
   ideaText?: string
+  forcedTab?: Platform
 }
 
 const PLATFORM_META: Record<Platform, { label: string; icon: string; color: string }> = {
@@ -19,14 +20,14 @@ const PLATFORM_META: Record<Platform, { label: string; icon: string; color: stri
   linkedin:        { label: 'LinkedIn',           icon: '🔵', color: '#0a66c2' },
 }
 
-export function PlatformSimFeed({ postsByPlatform, ideaText = '' }: Props) {
+export function PlatformSimFeed({ postsByPlatform, ideaText = '', forcedTab }: Props) {
   const activePlatforms = Object.keys(postsByPlatform).filter(
     k => (postsByPlatform[k as Platform]?.length ?? 0) > 0
   ) as Platform[]
 
   const [activeTab, setActiveTab] = useState<Platform | null>(null)
 
-  const tab = activeTab ?? activePlatforms[0] ?? null
+  const tab = forcedTab ?? activeTab ?? activePlatforms[0] ?? null
   const posts = tab ? (postsByPlatform[tab] ?? []) : []
 
   if (activePlatforms.length === 0) {

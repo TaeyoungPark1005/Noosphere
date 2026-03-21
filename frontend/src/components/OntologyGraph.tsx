@@ -1,5 +1,5 @@
 // frontend/src/components/OntologyGraph.tsx
-import { useState, useCallback, useMemo, memo, useRef } from 'react'
+import { useState, useCallback, useMemo, memo, useRef, useEffect } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import type { OntologyEntity, OntologyRelationship, OntologyData } from '../types'
 
@@ -69,12 +69,12 @@ interface SidePanelProps {
 }
 
 function SidePanel({ entity, entities, relationships, contextNodes, onClose }: SidePanelProps) {
-  if (!entity) return null
-
   const entityMap = useMemo(
     () => Object.fromEntries(entities.map(e => [e.id, e])),
     [entities]
   )
+
+  if (!entity) return null
 
   const outgoing = relationships.filter(r => r.from === entity.id)
   const incoming = relationships.filter(r => r.to === entity.id)
@@ -206,13 +206,22 @@ interface OntologyGraphProps {
   data: OntologyData
   contextNodes?: Array<{ id: string; title: string; source: string; url?: string }>
   width?: number
+  autoSelectId?: string
 }
 
-export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = [], width }: OntologyGraphProps) {
-  const [selectedEntity, setSelectedEntity] = useState<OntologyEntity | null>(null)
+export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = [], width, autoSelectId }: OntologyGraphProps) {
+  const [selectedEntity, setSelectedEntity] = useState<OntologyEntity | null>(() =>
+    autoSelectId ? (data.entities.find(e => e.id === autoSelectId) ?? null) : null
+  )
   const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set())
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(null)
+
+  useEffect(() => {
+    if (autoSelectId) {
+      setSelectedEntity(data.entities.find(e => e.id === autoSelectId) ?? null)
+    }
+  }, [autoSelectId, data.entities])
 
   const handleEngineStop = useCallback(() => {
     graphRef.current?.zoomToFit(400, 24)

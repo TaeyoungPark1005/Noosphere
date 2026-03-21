@@ -81,7 +81,7 @@ export function ResultPage() {
                   color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13,
                   fontWeight: 600, marginBottom: 4,
                 }}>
-                ↓ Download PDF
+                ↓ Download Report
               </a>
             </div>
 

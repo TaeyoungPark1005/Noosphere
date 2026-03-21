@@ -69,7 +69,7 @@ Return ONLY the JSON object."""
             ],
             tier="mid",
             provider=provider,
-            max_tokens=2048,
+            max_tokens=8192,
         )
         raw = (response.content or "").strip()
         if not raw:

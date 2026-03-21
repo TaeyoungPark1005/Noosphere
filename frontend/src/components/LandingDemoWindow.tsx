@@ -1,20 +1,253 @@
 import { useEffect, useState } from 'react'
 import { MOCK_SOURCES, MOCK_PERSONAS, MOCK_POSTS } from '../hooks/useMockSimulation'
 import { SOURCE_COLORS } from '../constants'
-import type { Platform, SocialPost } from '../types'
+import { ReportView } from './ReportView'
+import { MarkdownView } from './MarkdownView'
+import { PlatformSimFeed } from './PlatformSimFeed'
+import { PersonaCardView } from './PersonaCardView'
+import { SourcesView } from './SourcesView'
+import { OntologyGraph } from './OntologyGraph'
+import type { Platform, SocialPost, SimResults, OntologyData } from '../types'
+
+// ── Mock ontology (Noosphere domain map) ─────────────────────────────────────
+
+const MOCK_ONTOLOGY: OntologyData = {
+  domain_summary: 'AI-driven pre-launch market intelligence — multi-agent simulation of developer community reactions.',
+  entities: [
+    { id: 'e0', name: 'Noosphere',              type: 'product',        source_node_ids: [] },
+    { id: 'e1', name: 'Multi-Agent Simulation', type: 'framework',      source_node_ids: [] },
+    { id: 'e2', name: 'LLM APIs',               type: 'technology',     source_node_ids: [] },
+    { id: 'e3', name: 'Pre-launch Validation',  type: 'pain_point',     source_node_ids: [] },
+    { id: 'e4', name: 'Developer Communities',  type: 'market_segment', source_node_ids: [] },
+    { id: 'e5', name: 'Market Research',        type: 'market_segment', source_node_ids: [] },
+    { id: 'e6', name: 'Generative Agents',      type: 'research',       source_node_ids: [] },
+    { id: 'e7', name: 'Social Simulation',      type: 'concept',        source_node_ids: [] },
+    { id: 'e8', name: 'Hacker News',            type: 'product',        source_node_ids: [] },
+    { id: 'e9', name: 'Product Hunt',           type: 'product',        source_node_ids: [] },
+  ],
+  relationships: [
+    { from: 'e0', to: 'e1', type: 'built_on'        },
+    { from: 'e0', to: 'e2', type: 'built_on'        },
+    { from: 'e0', to: 'e3', type: 'addresses'       },
+    { from: 'e0', to: 'e4', type: 'targets'         },
+    { from: 'e0', to: 'e5', type: 'competes_with'   },
+    { from: 'e1', to: 'e7', type: 'enables'         },
+    { from: 'e6', to: 'e1', type: 'part_of'         },
+    { from: 'e2', to: 'e1', type: 'enables'         },
+    { from: 'e8', to: 'e4', type: 'part_of'         },
+    { from: 'e9', to: 'e4', type: 'part_of'         },
+  ],
+  market_tensions: ['simulation fidelity vs. speed', 'AI-generated vs. real feedback'],
+  key_trends: ['LLM agent frameworks', 'pre-launch intelligence', 'community-native GTM'],
+}
+
+const PLATFORM_COLORS: Record<Platform, string> = {
+  hackernews:      '#f97316',
+  producthunt:     '#ef4444',
+  indiehackers:    '#8b5cf6',
+  reddit_startups: '#b45309',
+  linkedin:        '#2563eb',
+}
+
 
 // ── Mock results (extracted from DemoPage) ───────────────────────────────────
 
-const MOCK_REPORT = {
-  verdict: 'mixed' as const,
-  segments: [
-    { name: 'Hacker News',       sentiment: 'neutral'  as const, summary: 'Technical community engaged but skeptical. Strong interest in methodology and simulation fidelity.' },
-    { name: 'Product Hunt',      sentiment: 'positive' as const, summary: 'Practitioners immediately connected with the pain point. Strong upvote potential.' },
-    { name: 'Indie Hackers',     sentiment: 'positive' as const, summary: 'Highly favorable reception. IH users acutely aware of positioning risk.' },
-    { name: 'Reddit r/startups', sentiment: 'neutral'  as const, summary: 'Mixed reception with constructive skepticism.' },
-    { name: 'LinkedIn',          sentiment: 'positive' as const, summary: 'Professional audience responded well to structured output and GTM framing.' },
+const MOCK_RESULTS: SimResults = {
+  sim_id: 'demo',
+  analysis_md: `## Market Analysis — Noosphere
+
+**Domain:** AI / Developer Tools · SaaS
+
+### Executive Summary
+
+Noosphere enters a nascent but rapidly growing category of AI-driven market intelligence tools. The concept of simulating social reactions before launch resonates strongly with founders and product managers who have experienced costly positioning mistakes post-launch.
+
+---
+
+### Community Reception Overview
+
+Across all five simulated platforms, the overall reception was **cautiously optimistic**. Technical communities (Hacker News, r/startups) exhibited healthy skepticism around simulation fidelity, while practitioner communities (Product Hunt, Indie Hackers, LinkedIn) responded with clear enthusiasm.
+
+**Hacker News** — High engagement with critical undertones. The HN community praised the technical ambition but pushed back on whether LLM-based simulations can accurately model community-specific culture and bias. The "AI wrapper" concern surfaced but was partially offset by the depth of the multi-agent architecture.
+
+**Product Hunt** — Strong positive response. Practitioners resonated with the pain point immediately. The "launch validation" framing is compelling to this audience. Expected to perform well on launch day.
+
+**Indie Hackers** — Highly favorable. Indie hackers are acutely aware of the cost of misaligned positioning. The product's ability to simulate Reddit and HN reactions is a direct address of their core anxiety.
+
+**Reddit r/startups** — Mixed. Some users were skeptical of AI-generated feedback as a substitute for real customer conversations. Others saw it as a complement to, not replacement for, traditional validation.
+
+**LinkedIn** — Positive and professional. GTM teams and PMs responded well to the structured output (verdict + segments + improvements). The corporate framing around "reducing go-to-market uncertainty" landed effectively.
+
+---
+
+### Key Signals
+
+- The "before you launch" positioning is the strongest hook across all communities
+- Multi-platform coverage (not just one community) is a significant differentiator
+- The word "simulate" triggers skepticism in technical communities — consider "predict" or "model"
+- Persona diversity and methodology transparency will be important for trust-building
+
+---
+
+### Recommended Actions
+
+1. **Lead with outcomes, not mechanics** — Frame results as "here's what HN will say" not "here's how our agents work"
+2. **Publish a methodology doc** — Technical communities want to audit the simulation approach
+3. **Add a confidence score** — Helps users calibrate how much to rely on results
+4. **Community-specific tuning** — Show that you understand each platform's culture, not just aggregate sentiment`,
+
+  report_json: {
+    verdict: 'mixed',
+    evidence_count: 127,
+    segments: [
+      {
+        name: 'Hacker News',
+        sentiment: 'neutral',
+        summary: 'Technical community engaged but skeptical. Strong interest in methodology and simulation fidelity. "AI wrapper" concern raised but countered by depth of implementation.',
+        key_quotes: [
+          '"Interesting concept. The biggest risk I see is that simulated reactions might not capture the nuance of actual HN culture — we\'re famously unpredictable."',
+          '"The technical implementation here is more interesting than the product surface suggests. LLM-based agent simulation with network effects modeled in?"',
+          '"Another AI wrapper? Show me the methodology."',
+        ],
+      },
+      {
+        name: 'Product Hunt',
+        sentiment: 'positive',
+        summary: 'Practitioners immediately connected with the pain point. Strong upvote potential. "Launch validation" framing resonates powerfully with this audience.',
+        key_quotes: [
+          '"This is exactly what I needed before my last launch. Would have saved me weeks of misaligned positioning."',
+          '"🚀 Day 1 upvote. The persona diversity feels surprisingly real."',
+          '"Finally a tool that answers the question I ask before every launch."',
+        ],
+      },
+      {
+        name: 'Indie Hackers',
+        sentiment: 'positive',
+        summary: 'Highly favorable reception. IH users acutely aware of positioning risk. Multiple users reported plans to test on their own products immediately.',
+        key_quotes: [
+          '"Just tried this on my SaaS landing page. The Reddit simulation was surprisingly accurate — called out my vague value prop immediately."',
+          '"Does this work for non-technical products? I build no-code tools and my users are not developers."',
+          '"Running this on my B2B SaaS tonight. Will report back."',
+        ],
+      },
+      {
+        name: 'Reddit r/startups',
+        sentiment: 'neutral',
+        summary: 'Mixed reception with constructive skepticism. Community values real customer feedback over AI simulation but sees potential as a complement.',
+        key_quotes: [
+          '"From an investment standpoint, tools that reduce go-to-market uncertainty are always interesting. The question is repeatability."',
+          '"One good simulation doesn\'t make a moat."',
+          '"Interesting but I\'d still rather talk to 10 real customers."',
+        ],
+      },
+      {
+        name: 'LinkedIn',
+        sentiment: 'positive',
+        summary: 'Professional audience responded well to structured output and GTM framing. PMs and GTM leaders see clear workflow integration.',
+        key_quotes: [
+          '"As a PM, the ability to stress-test messaging across different communities before launch is massive."',
+          '"The LinkedIn simulation is uncannily accurate — right down to the corporate buzzword patterns."',
+          '"Shared this with our GTM team. Everyone immediately saw the use case."',
+        ],
+      },
+    ],
+    criticism_clusters: [
+      {
+        theme: 'Simulation fidelity concerns',
+        count: 23,
+        examples: [
+          'Can AI truly capture community-specific culture and bias?',
+          'Simulated personas may not reflect real edge cases and outliers',
+          'HN culture is famously hard to predict — even for humans',
+        ],
+      },
+      {
+        theme: 'AI wrapper skepticism',
+        count: 17,
+        examples: [
+          '"Another AI wrapper" sentiment from technical users',
+          'Questions about defensibility and moat',
+          'Concerns about prompt engineering quality',
+        ],
+      },
+      {
+        theme: 'Methodology transparency',
+        count: 14,
+        examples: [
+          'No published methodology for simulation approach',
+          'Unclear how agent personas are calibrated',
+          'Want to see validation against real launch outcomes',
+        ],
+      },
+    ],
+    improvements: [
+      { suggestion: 'Publish a detailed methodology document explaining agent design and simulation approach', frequency: 31 },
+      { suggestion: 'Add confidence scores or uncertainty ranges to simulation outputs', frequency: 24 },
+      { suggestion: 'Include a "real vs. simulated" accuracy case study from a past launch', frequency: 19 },
+      { suggestion: 'Allow users to customize persona demographics and technical backgrounds', frequency: 15 },
+      { suggestion: 'Add integration with existing tools (Notion, Loom, Figma) for frictionless input', frequency: 11 },
+    ],
+  },
+
+  posts_json: {
+    hackernews: [
+      { id: 'r-hn-1', platform: 'hackernews', author_node_id: 'n1', author_name: 'Marcus Chen', content: 'Interesting concept. The biggest risk I see is that simulated reactions might not capture the nuance of actual HN culture — we\'re famously unpredictable. That said, for early validation this could be genuinely useful.', action_type: 'comment', round_num: 1, upvotes: 67, downvotes: 2, parent_id: null },
+      { id: 'r-hn-2', platform: 'hackernews', author_node_id: 'n5', author_name: 'TechSkeptic99', content: 'Another AI wrapper? The real question is how accurately it models different community subcultures. Reddit r/startups vs HN have very different signal-to-noise ratios. Show me the methodology.', action_type: 'comment', round_num: 1, upvotes: 43, downvotes: 1, parent_id: null },
+      { id: 'r-hn-3', platform: 'hackernews', author_node_id: 'n9', author_name: 'rachel_cto', content: 'The technical implementation here is more interesting than the product surface suggests. LLM-based agent simulation with network effects modeled in? Someone did their homework on social dynamics research.', action_type: 'comment', round_num: 2, upvotes: 89, downvotes: 0, parent_id: null },
+    ],
+    producthunt: [
+      { id: 'r-ph-1', platform: 'producthunt', author_node_id: 'n6', author_name: 'priya_builds', content: '🚀 This is exactly what I needed before my last launch. Would have saved me weeks of misaligned positioning. Upvoted!', action_type: 'review', round_num: 1, upvotes: 54, downvotes: 0, parent_id: null },
+    ],
+    indiehackers: [
+      { id: 'r-ih-1', platform: 'indiehackers', author_node_id: 'n3', author_name: 'devdave42', content: 'Just tried this on my SaaS landing page. The Reddit simulation was surprisingly accurate — called out my vague value prop immediately. Highly recommend running this before you ship.', action_type: 'post', round_num: 1, upvotes: 38, downvotes: 0, parent_id: null },
+      { id: 'r-ih-2', platform: 'indiehackers', author_node_id: 'n8', author_name: 'nocodeNate', content: 'Does this work for non-technical products? I build no-code tools and my users are not developers. Curious if the personas can capture that audience accurately.', action_type: 'comment', round_num: 2, upvotes: 21, downvotes: 0, parent_id: null },
+    ],
+    reddit_startups: [
+      { id: 'r-rs-1', platform: 'reddit_startups', author_node_id: 'n4', author_name: 'VentureVC_Alex', content: 'From an investment standpoint, tools that reduce go-to-market uncertainty are always interesting. The question is repeatability. One good simulation doesn\'t make a moat.', action_type: 'comment', round_num: 1, upvotes: 29, downvotes: 3, parent_id: null },
+      { id: 'r-rs-2', platform: 'reddit_startups', author_node_id: 'n10', author_name: 'bootstrapped_bo', content: 'Running this on my B2B SaaS tonight. Will report back. The free tier seems generous for what you get. Anyone else tried it on enterprise positioning?', action_type: 'post', round_num: 2, upvotes: 17, downvotes: 1, parent_id: null },
+    ],
+    linkedin: [
+      { id: 'r-li-1', platform: 'linkedin', author_node_id: 'n2', author_name: 'Sarah K.', content: 'Just discovered Noosphere and I\'m genuinely impressed. As a PM, the ability to stress-test messaging across different communities before launch is massive. The persona diversity feels real.', action_type: 'post', round_num: 1, upvotes: 76, downvotes: 0, parent_id: null },
+      { id: 'r-li-2', platform: 'linkedin', author_node_id: 'n7', author_name: 'james_pm', content: 'Shared this with our GTM team. The LinkedIn simulation is uncannily accurate — right down to the corporate buzzword patterns. 😄 Solid product.', action_type: 'comment', round_num: 2, upvotes: 61, downvotes: 0, parent_id: null },
+    ],
+  },
+
+  personas_json: {
+    hackernews: [
+      { node_id: 'n1', name: 'Marcus Chen', role: 'Senior Software Engineer', mbti: 'INTJ', bias: 'technically rigorous, skeptical of hype', interests: ['distributed systems', 'Rust', 'open source'] },
+      { node_id: 'n5', name: 'TechSkeptic99', role: 'Staff Engineer', mbti: 'INTP', bias: 'contrarian, methodology-focused', interests: ['compilers', 'formal verification', 'benchmarking'] },
+      { node_id: 'n9', name: 'rachel_cto', role: 'CTO', mbti: 'ENTJ', bias: 'pragmatic, research-aware', interests: ['AI research', 'system design', 'team building'] },
+    ],
+    producthunt: [
+      { node_id: 'n6', name: 'priya_builds', role: 'Founder', mbti: 'ENFJ', bias: 'optimistic early adopter', interests: ['SaaS', 'no-code', 'community building'] },
+    ],
+    indiehackers: [
+      { node_id: 'n3', name: 'devdave42', role: 'Indie Hacker', mbti: 'ISTP', bias: 'pragmatic, ROI-focused', interests: ['bootstrapping', 'Laravel', 'MRR optimization'] },
+      { node_id: 'n8', name: 'nocodeNate', role: 'No-code builder', mbti: 'ESFP', bias: 'accessibility-focused, non-technical', interests: ['Bubble', 'Zapier', 'solopreneurship'] },
+    ],
+    reddit_startups: [
+      { node_id: 'n4', name: 'VentureVC_Alex', role: 'VC Analyst', mbti: 'ESTJ', bias: 'investment return focused', interests: ['market sizing', 'defensibility', 'unit economics'] },
+      { node_id: 'n10', name: 'bootstrapped_bo', role: 'Bootstrapped founder', mbti: 'ISTJ', bias: 'cost-conscious, self-reliant', interests: ['B2B SaaS', 'cold outreach', 'churn reduction'] },
+    ],
+    linkedin: [
+      { node_id: 'n2', name: 'Sarah K.', role: 'Product Manager', mbti: 'ENFP', bias: 'user empathy, cross-functional', interests: ['product strategy', 'user research', 'OKRs'] },
+      { node_id: 'n7', name: 'james_pm', role: 'Head of Product', mbti: 'ENTJ', bias: 'GTM execution', interests: ['positioning', 'sales enablement', 'roadmapping'] },
+    ],
+  },
+  report_md: '',
+  sources_json: [
+    { id: 's1', source: 'github',           title: 'microsoft/autogen — Multi-Agent Framework',                          score: 0.91, url: 'https://github.com/microsoft/autogen',     date: '2024-11' },
+    { id: 's2', source: 'arxiv',            title: 'LLM-based Multi-Agent Systems for Social Simulation',                score: 0.88, url: 'https://arxiv.org/abs/2312.01234',          date: '2024-09' },
+    { id: 's3', source: 'hackernews',       title: 'Ask HN: How do you validate product ideas before building?',         score: 0.85, url: 'https://news.ycombinator.com/item?id=1',   date: '2024-10' },
+    { id: 's4', source: 'github',           title: 'stanfordnlp/dspy — Programming Foundation Models',                   score: 0.82, url: 'https://github.com/stanfordnlp/dspy',       date: '2024-12' },
+    { id: 's5', source: 'semantic_scholar', title: 'Generative Agents: Interactive Simulacra of Human Behavior',         score: 0.80, url: 'https://arxiv.org/abs/2304.03442',          date: '2023-04' },
+    { id: 's6', source: 'reddit',           title: 'r/startups: What tools do you use for pre-launch market validation?', score: 0.78, url: 'https://reddit.com/r/startups',             date: '2024-11' },
+    { id: 's7', source: 'product_hunt',     title: 'Top AI-powered research tools of 2024',                              score: 0.74, url: 'https://producthunt.com',                    date: '2024-12' },
+    { id: 's8', source: 'arxiv',            title: 'AgentSims: An Open-Source Sandbox for LLM Agent Evaluation',        score: 0.71, url: 'https://arxiv.org/abs/2308.04026',          date: '2023-08' },
   ],
 }
+
+// ── Demo config constants ─────────────────────────────────────────────────────
 
 const DEMO_INPUT = `Noosphere is an AI-powered market simulator that predicts real-world reactions to your product before you launch.
 
@@ -32,182 +265,302 @@ const PLATFORM_OPTIONS: Array<{ id: Platform; label: string; icon: string }> = [
   { id: 'linkedin',        label: 'LinkedIn',          icon: '🔵' },
 ]
 
-const SENTIMENT_COLOR: Record<string, string> = {
-  positive: '#22c55e',
-  neutral:  '#f59e0b',
-  negative: '#ef4444',
-}
-
 type Phase = 'home' | 'simulate' | 'results'
-type ResultTab = 'report' | 'feed' | 'analysis'
+type ResultTab = 'analysis' | 'report' | 'feed' | 'personas' | 'sources'
 
 // ── Sub-components (display-only, no event handlers) ─────────────────────────
 
 function HomePhase({ displayText, runClicked }: { displayText: string; runClicked: boolean }) {
   return (
-    <div style={{ padding: '32px 28px 24px', textAlign: 'left' }}>
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.04em', margin: '0 0 8px', color: '#1e293b' }}>
-          How will the market react?
-        </h2>
-        <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>
-          Describe your product and simulate real-world reactions across tech communities.
-        </p>
-      </div>
+    <div style={{ background: '#f8fafc', height: '100%', overflowY: 'hidden' }}>
+      <div style={{ padding: '32px 24px 24px' }}>
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 34, fontWeight: 800, letterSpacing: '-0.04em', margin: '0 0 10px', color: '#1e293b' }}>
+            How will the market react?
+          </h1>
+          <p style={{ color: '#64748b', fontSize: 15, margin: 0 }}>
+            Describe your product and simulate real-world reactions across tech communities.
+          </p>
+        </div>
 
-      {/* Textarea — matches real app (focused state with purple border) */}
-      <div style={{
-        width: '100%', padding: '14px 16px',
-        fontSize: 13, border: '1.5px solid #8b5cf6',
-        borderRadius: 12, background: '#fff',
-        fontFamily: 'inherit', lineHeight: 1.6,
-        color: '#1e293b',
-        boxShadow: '0 0 0 3px rgba(139,92,246,0.12)',
-        minHeight: 108, whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
-        boxSizing: 'border-box' as const,
-      }}>
-        {displayText}
-        {displayText.length < DEMO_INPUT.length && (
-          <span className="cursor-blink" style={{ display: 'inline' }} />
-        )}
-      </div>
+        <div style={{
+          width: '100%', padding: '16px 18px',
+          fontSize: 15,
+          border: `1.5px solid ${displayText.length < DEMO_INPUT.length ? '#8b5cf6' : '#e2e8f0'}`,
+          borderRadius: 12, background: '#fff',
+          fontFamily: 'inherit', lineHeight: 1.6,
+          color: '#1e293b',
+          boxShadow: displayText.length < DEMO_INPUT.length ? '0 0 0 3px rgba(139,92,246,0.12)' : 'none',
+          minHeight: 168, whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          boxSizing: 'border-box' as const,
+        }}>
+          {displayText}
+          {displayText.length < DEMO_INPUT.length && (
+            <span className="cursor-blink" style={{ display: 'inline' }} />
+          )}
+        </div>
 
-      {/* Platform buttons — exact match with real app */}
-      <div style={{ marginTop: 14, display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-        {PLATFORM_OPTIONS.map(p => (
-          <span key={p.id} style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '7px 14px', fontSize: 13, borderRadius: 8,
-            border: '1.5px solid #1e293b',
-            background: '#1e293b', color: '#fff', fontWeight: 600,
-            boxShadow: '0 2px 8px rgba(30,41,59,0.25)',
-          }}>
-            <span>{p.icon}</span> {p.label}
-          </span>
-        ))}
-      </div>
+        <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {PLATFORM_OPTIONS.map(p => (
+            <span key={p.id} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '7px 14px', fontSize: 13, borderRadius: 8,
+              border: '1.5px solid #1e293b',
+              background: '#1e293b', color: '#fff', fontWeight: 600,
+              boxShadow: '0 2px 8px rgba(30,41,59,0.25)',
+            }}>
+              <span>{p.icon}</span> {p.label}
+            </span>
+          ))}
+        </div>
 
-      {/* Run button — exact match with real app */}
-      <div style={{
-        marginTop: 18,
-        padding: '12px 32px', fontSize: 14, fontWeight: 700,
-        background: '#1e293b', color: '#fff',
-        borderRadius: 10, display: 'inline-block',
-        letterSpacing: '-0.01em',
-        animation: runClicked ? 'runClick 200ms ease forwards' : 'none',
-      }}>
-        Run Simulation →
+        <div style={{ marginTop: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#64748b', fontSize: 13 }}>
+            <span>▶</span>
+            Advanced options
+            <span style={{
+              fontSize: 11, padding: '2px 8px', borderRadius: 10,
+              background: '#f1f5f9', color: '#94a3b8', marginLeft: 4,
+            }}>
+              English · 12r · 50a · ~470 sources
+            </span>
+          </div>
+        </div>
+
+        <div style={{
+          marginTop: 20,
+          padding: '14px 36px', fontSize: 15, fontWeight: 700,
+          background: '#1e293b', color: '#fff',
+          borderRadius: 10, display: 'inline-block',
+          letterSpacing: '-0.01em',
+          animation: runClicked ? 'runClick 200ms ease forwards' : 'none',
+        }}>
+          Run Simulation →
+        </div>
       </div>
     </div>
   )
 }
 
 function SimulatePhase({
-  sources, personaCount, personaPct, posts, simRound,
+  sources, personaCount, personaPct, posts, simRound, ontology, autoSelectId, activePlatform,
 }: {
   sources: typeof MOCK_SOURCES
   personaCount: number
   personaPct: number
   posts: SocialPost[]
   simRound: number
+  ontology: OntologyData | null
+  autoSelectId?: string
+  activePlatform?: Platform
 }) {
   const showSources  = sources.length > 0
   const showPersonas = sources.length === 0 && personaCount > 0 && simRound === 0
   const showPosts    = simRound > 0
+
+  // Group posts by platform for PlatformSimFeed
+  const postsByPlatform = posts.reduce((acc, post) => {
+    if (!acc[post.platform]) acc[post.platform] = []
+    acc[post.platform]!.push(post)
+    return acc
+  }, {} as Partial<Record<Platform, SocialPost[]>>)
+
+  const activePlatforms = Object.keys(postsByPlatform) as Platform[]
+  const totalPosts = posts.length
 
   const phaseLabel = showSources
     ? 'Searching sources...'
     : showPersonas
     ? `Generating personas — ${personaCount} / ${MOCK_PERSONAS.length}`
     : showPosts
-    ? `Round ${simRound} · ${posts.length} posts`
+    ? `Round ${simRound} · ${totalPosts} posts`
     : 'Initializing...'
 
-  return (
-    <div style={{ padding: '20px 24px', height: '100%', overflowY: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12 }}>
+  // 피드 패널 (헤더 + 소스/페르소나/포스트)
+  const feedPanel = (
+    <>
+      {/* Phase header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
         <span style={{
-          width: 8, height: 8, borderRadius: '50%',
-          background: '#22c55e', flexShrink: 0, display: 'inline-block',
+          display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+          background: '#22c55e', flexShrink: 0,
           animation: 'pulse 1.5s infinite',
         }} />
-        <span
-          className={showPosts ? '' : 'cursor-blink'}
-          style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', letterSpacing: '-0.02em' }}
-        >
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em' }}>
           {phaseLabel}
-        </span>
+        </h2>
       </div>
 
+      {/* Persona progress bar */}
       {showPersonas && (
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', marginBottom: 5 }}>
+        <div style={{ margin: '0 0 24px 0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#94a3b8', marginBottom: 6 }}>
             <span>Building agent personas</span>
             <span>{personaCount} / {MOCK_PERSONAS.length}</span>
           </div>
-          <div style={{ height: 5, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+          <div style={{ height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
             <div style={{
               height: '100%', borderRadius: 3,
-              background: 'linear-gradient(90deg, #6355e0, #8070ff)',
+              background: 'linear-gradient(90deg, #8b5cf6, #6366f1)',
               width: `${personaPct}%`,
-              transition: 'width 0.3s ease',
-              boxShadow: '0 0 6px rgba(99,85,224,0.4)',
+              transition: 'width 0.4s ease',
+              boxShadow: '0 0 8px rgba(139,92,246,0.5)',
             }} />
           </div>
         </div>
       )}
 
+      {/* Source timeline */}
       {showSources && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          {sources.slice(0, 5).map((src, i) => (
-            <div key={i} className="source-item" style={{
-              padding: '7px 10px', borderRadius: 7,
-              background: '#f8fafc', border: '1px solid #e2e8f0',
-              borderLeft: `3px solid ${SOURCE_COLORS[src.source as keyof typeof SOURCE_COLORS] || '#94a3b8'}`,
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+            {sources.length} items collected
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {sources.map((src, i) => (
+              <div key={i} className="source-item" style={{
+                padding: '8px 12px', borderRadius: 8,
+                background: '#fff', border: '1px solid #e2e8f0',
+                borderLeft: `3px solid ${SOURCE_COLORS[src.source as keyof typeof SOURCE_COLORS] || '#94a3b8'}`,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 8,
+                    background: `${SOURCE_COLORS[src.source as keyof typeof SOURCE_COLORS] || '#94a3b8'}18`,
+                    color: SOURCE_COLORS[src.source as keyof typeof SOURCE_COLORS] || '#64748b',
+                    textTransform: 'uppercase', letterSpacing: '0.04em',
+                  }}>
+                    {src.source}
+                  </span>
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', lineHeight: 1.4 }}>
+                  {src.title}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Platform counters */}
+      {showPosts && activePlatforms.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+          {activePlatforms.map(platform => (
+            <span key={platform} style={{
+              fontSize: 12, padding: '4px 10px', borderRadius: 20,
+              background: '#f1f5f9', color: '#475569',
+              display: 'flex', alignItems: 'center', gap: 5,
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                <span style={{
-                  fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4,
-                  background: `${SOURCE_COLORS[src.source as keyof typeof SOURCE_COLORS] || '#94a3b8'}18`,
-                  color: SOURCE_COLORS[src.source as keyof typeof SOURCE_COLORS] || '#64748b',
-                  textTransform: 'uppercase', letterSpacing: '0.04em',
-                  fontFamily: 'IBM Plex Mono, monospace',
-                }}>
-                  {src.source}
-                </span>
-              </div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#1e293b', lineHeight: 1.4 }}>
-                {src.title}
-              </div>
-            </div>
+              <span style={{
+                width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                background: PLATFORM_COLORS[platform] || '#94a3b8',
+              }} />
+              {platform.replace('_', ' ')} · {postsByPlatform[platform]?.length ?? 0}
+            </span>
           ))}
         </div>
       )}
 
-      {showPosts && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {posts.slice(-4).map(post => (
-            <div key={post.id} className="post-item" style={{
-              padding: '9px 12px', borderRadius: 8,
-              border: '1px solid #e2e8f0', background: '#fff',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <span style={{
-                  fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 5,
-                  background: '#f1f5f9', color: '#475569',
-                  textTransform: 'uppercase', fontFamily: 'IBM Plex Mono, monospace',
+      {/* PlatformSimFeed */}
+      {showPosts && totalPosts > 0 && (
+        <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+          <PlatformSimFeed postsByPlatform={postsByPlatform} ideaText="Noosphere – AI market simulator" forcedTab={activePlatform} />
+        </div>
+      )}
+    </>
+  )
+
+  return (
+    <div style={{ background: '#f8fafc', height: '100%', overflowY: 'hidden' }}>
+      {ontology ? (
+        /* 2컬럼 — 온톨로지 수신 후 (SimulatePage와 동일) */
+        <div style={{
+          width: '100%', padding: '32px 24px',
+          display: 'flex', gap: 24, alignItems: 'flex-start',
+          boxSizing: 'border-box',
+        }}>
+          {/* 좌측: Ecosystem Map + 노드 카드 */}
+          <div style={{ width: 360, flexShrink: 0, minWidth: 0, animation: 'fadeInUp 0.4s ease' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 10px' }}>
+              Ecosystem Map
+            </p>
+            <OntologyGraph data={ontology} contextNodes={[]} width={360} />
+            {/* 선택 노드 인포 카드 (오버레이 없이 그래프 아래에 표시) */}
+            {autoSelectId && (() => {
+              const NODE_COLORS_DEMO: Record<string, string> = {
+                framework: '#3b82f6', product: '#22c55e', technology: '#a855f7',
+                market_segment: '#eab308', pain_point: '#ef4444', research: '#14b8a6',
+                concept: '#c084fc',
+              }
+              const REL_LABEL_DEMO: Record<string, string> = {
+                built_on: 'built on', addresses: 'addresses', targets: 'targets',
+                competes_with: 'competes with', enables: 'enables', part_of: 'part of',
+              }
+              const entity = ontology.entities.find(e => e.id === autoSelectId)
+              if (!entity) return null
+              const entityMap = Object.fromEntries(ontology.entities.map(e => [e.id, e]))
+              const outgoing = ontology.relationships.filter(r => r.from === entity.id)
+              const incoming = ontology.relationships.filter(r => r.to === entity.id)
+              const color = NODE_COLORS_DEMO[entity.type] ?? '#94a3b8'
+              return (
+                <div key={autoSelectId} style={{
+                  marginTop: 8, padding: '10px 12px', borderRadius: 8,
+                  background: 'rgba(15,23,42,0.92)', border: '1px solid rgba(255,255,255,0.08)',
+                  animation: 'fadeIn 0.25s ease',
                 }}>
-                  {post.platform.replace('_', ' ')}
-                </span>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#1e293b' }}>{post.author_name}</span>
-              </div>
-              <p style={{ margin: 0, fontSize: 11, color: '#374151', lineHeight: 1.5 }}>
-                {post.content.slice(0, 100)}{post.content.length > 100 ? '...' : ''}
-              </p>
-              <div style={{ marginTop: 4, fontSize: 10, color: '#94a3b8' }}>▲ {post.upvotes}</div>
-            </div>
-          ))}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                      background: color + '28', border: '1px solid ' + color + '60',
+                      color, textTransform: 'uppercase', letterSpacing: '0.05em',
+                    }}>{entity.type}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}>{entity.name}</span>
+                    <span style={{ fontSize: 11, color: '#64748b', marginLeft: 'auto' }}>
+                      {outgoing.length + incoming.length} connections
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {outgoing.slice(0, 3).map((r, i) => {
+                      const tgt = entityMap[r.to]
+                      if (!tgt) return null
+                      return (
+                        <span key={i} style={{
+                          fontSize: 10, padding: '2px 7px', borderRadius: 10,
+                          background: 'rgba(255,255,255,0.06)',
+                          color: '#94a3b8',
+                        }}>
+                          → {REL_LABEL_DEMO[r.type] ?? r.type} <span style={{ color: '#cbd5e1', fontWeight: 600 }}>{tgt.name}</span>
+                        </span>
+                      )
+                    })}
+                    {incoming.slice(0, 2).map((r, i) => {
+                      const src = entityMap[r.from]
+                      if (!src) return null
+                      return (
+                        <span key={`in-${i}`} style={{
+                          fontSize: 10, padding: '2px 7px', borderRadius: 10,
+                          background: 'rgba(255,255,255,0.06)',
+                          color: '#64748b',
+                        }}>
+                          ← {REL_LABEL_DEMO[r.type] ?? r.type} <span style={{ color: '#94a3b8', fontWeight: 600 }}>{src.name}</span>
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+          {/* 우측: 피드 */}
+          <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
+            {feedPanel}
+          </div>
+        </div>
+      ) : (
+        /* 1컬럼 — 온톨로지 수신 전 */
+        <div style={{ padding: '36px 24px 20px' }}>
+          {feedPanel}
         </div>
       )}
     </div>
@@ -216,109 +569,89 @@ function SimulatePhase({
 
 function ResultsPhase({ tab }: { tab: ResultTab }) {
   const tabs: { id: ResultTab; label: string }[] = [
+    { id: 'analysis', label: 'Analysis' },
     { id: 'report',   label: 'Simulation' },
     { id: 'feed',     label: 'Social Feed' },
-    { id: 'analysis', label: 'Analysis' },
+    { id: 'personas', label: 'Personas' },
+    { id: 'sources',  label: 'Sources' },
   ]
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', padding: '0 16px', flexShrink: 0 }}>
-        {tabs.map(t => (
-          <div key={t.id} style={{
-            padding: '10px 14px', fontSize: 12, cursor: 'default',
-            fontWeight: tab === t.id ? 600 : 400,
-            borderBottom: tab === t.id ? '2px solid #1e293b' : '2px solid transparent',
-            color: tab === t.id ? '#1e293b' : '#64748b',
-            transition: 'color 0.15s, border-color 0.15s',
+    <div style={{ background: '#fafafa', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Top bar — exact DemoResultView / ResultPage style */}
+      <div style={{ width: '100%', padding: '24px 24px 0', flexShrink: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ color: '#64748b', fontSize: 14 }}>← Run demo again</div>
+          <div style={{
+            fontSize: 12, padding: '4px 12px', borderRadius: 20,
+            background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', fontWeight: 600,
           }}>
-            {t.label}
+            Demo Results
           </div>
-        ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {tabs.map(t => (
+              <div key={t.id} style={{
+                padding: '10px 20px', fontSize: 14, cursor: 'default',
+                fontWeight: tab === t.id ? 600 : 400,
+                borderBottom: tab === t.id ? '2px solid #1e293b' : '2px solid transparent',
+                color: tab === t.id ? '#1e293b' : '#64748b',
+                transition: 'color 0.15s, border-color 0.15s',
+              }}>
+                {t.label}
+              </div>
+            ))}
+          </div>
+          <div style={{
+            display: 'inline-block', padding: '8px 18px', background: '#1e293b',
+            color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, marginBottom: 4,
+          }}>
+            ↓ Download Report
+          </div>
+        </div>
       </div>
 
-      <div key={tab} className="tab-content" style={{ flex: 1, overflow: 'hidden', padding: '14px 18px' }}>
-        {tab === 'report' && (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <span style={{
-                fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                background: '#fef3c7', color: '#d97706', border: '1px solid #fde68a',
-                fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase',
-              }}>
-                Mixed
-              </span>
-              <span style={{ fontSize: 11, color: '#64748b' }}>127 signals · 5 platforms</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {MOCK_REPORT.segments.map(seg => (
-                <div key={seg.name} style={{
-                  display: 'flex', alignItems: 'center', gap: 9,
-                  padding: '7px 11px', borderRadius: 7,
-                  border: '1px solid #e2e8f0', background: '#f8fafc',
-                }}>
-                  <span style={{
-                    width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                    background: SENTIMENT_COLOR[seg.sentiment],
-                  }} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#1e293b', width: 120, flexShrink: 0 }}>
-                    {seg.name}
-                  </span>
-                  <span style={{ fontSize: 10.5, color: '#64748b', lineHeight: 1.4 }}>
-                    {seg.summary.slice(0, 55)}...
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+      {/* Tab content — uses same components as DemoResultView */}
+      <div key={tab} className="tab-content" style={{ flex: 1, overflow: 'hidden', padding: '0 24px' }}>
+        {tab === 'analysis' && (
+          <MarkdownView content={MOCK_RESULTS.analysis_md} />
         )}
-
+        {tab === 'report' && (
+          <ReportView report={MOCK_RESULTS.report_json} simId="demo" />
+        )}
         {tab === 'feed' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {[
-              { platform: 'producthunt', author: 'priya_builds', content: '🚀 This is exactly what I needed before my last launch. Would have saved me weeks of misaligned positioning. Upvoted!', upvotes: 54 },
-              { platform: 'hackernews',  author: 'rachel_cto',   content: 'The technical implementation here is more interesting than the product surface suggests. LLM-based agent simulation with network effects modeled in?', upvotes: 89 },
-              { platform: 'linkedin',    author: 'Sarah K.',      content: 'As a PM, the ability to stress-test messaging across different communities before launch is massive. The persona diversity feels real.', upvotes: 76 },
-            ].map((post, i) => (
-              <div key={i} style={{
-                padding: '9px 11px', borderRadius: 8,
-                border: '1px solid #e2e8f0', background: '#fff',
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 16 }}>
+            {Object.entries(MOCK_RESULTS.posts_json).flatMap(([, posts]) => posts ?? []).map(post => (
+              <div key={post.id} style={{
+                background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
+                padding: '16px 18px',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <span style={{
-                    fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 5,
+                    fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
                     background: '#f1f5f9', color: '#475569', textTransform: 'capitalize',
-                    fontFamily: 'IBM Plex Mono, monospace',
                   }}>
                     {post.platform.replace('_', ' ')}
                   </span>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#1e293b' }}>{post.author}</span>
-                  <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 'auto' }}>▲ {post.upvotes}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{post.author_name}</span>
+                  <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>Round {post.round_num}</span>
                 </div>
-                <p style={{ margin: 0, fontSize: 11, color: '#374151', lineHeight: 1.5 }}>{post.content}</p>
+                <p style={{ margin: 0, fontSize: 14, color: '#374151', lineHeight: 1.6 }}>{post.content}</p>
+                <div style={{ marginTop: 8, display: 'flex', gap: 12, fontSize: 12, color: '#94a3b8' }}>
+                  <span>▲ {post.upvotes}</span>
+                  {post.downvotes > 0 && <span>▼ {post.downvotes}</span>}
+                </div>
               </div>
             ))}
           </div>
         )}
-
-        {tab === 'analysis' && (
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>
-              Market Analysis — Noosphere
-            </div>
-            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 10 }}>
-              <strong style={{ color: '#475569' }}>Domain:</strong> AI / Developer Tools · SaaS
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', marginBottom: 5 }}>Executive Summary</div>
-            <p style={{ fontSize: 11, color: '#374151', lineHeight: 1.65, margin: 0 }}>
-              Noosphere enters a nascent but rapidly growing category of AI-driven market intelligence tools.
-              The concept of simulating social reactions before launch resonates strongly with founders and
-              product managers who have experienced costly positioning mistakes post-launch.
-            </p>
-            <p style={{ fontSize: 11, color: '#374151', lineHeight: 1.65, margin: '8px 0 0' }}>
-              Across all five simulated platforms, the overall reception was <strong>cautiously optimistic</strong>.
-              Technical communities exhibited healthy skepticism, while practitioner communities responded with enthusiasm.
-            </p>
+        {tab === 'personas' && (
+          <PersonaCardView personas={MOCK_RESULTS.personas_json} />
+        )}
+        {tab === 'sources' && (
+          <div style={{ paddingTop: 16 }}>
+            <SourcesView sources={MOCK_RESULTS.sources_json} />
           </div>
         )}
       </div>
@@ -334,22 +667,27 @@ export function LandingDemoWindow() {
   const [typedChars,   setTypedChars]   = useState(0)
   const [runClicked,   setRunClicked]   = useState(false)
   const [sources,      setSources]      = useState<typeof MOCK_SOURCES>([])
+  const [ontology,     setOntology]     = useState<OntologyData | null>(null)
   const [personaCount, setPersonaCount] = useState(0)
   const [posts,        setPosts]        = useState<SocialPost[]>([])
   const [simRound,     setSimRound]     = useState(0)
-  const [resultTab,    setResultTab]    = useState<ResultTab>('report')
-  const [visible,      setVisible]      = useState(true)
+  const [resultTab,    setResultTab]    = useState<ResultTab>('analysis')
+  const [autoSelectId,    setAutoSelectId]    = useState<string | undefined>(undefined)
+  const [activePlatform,  setActivePlatform]  = useState<Platform | undefined>(undefined)
+  const [visible,         setVisible]         = useState(true)
 
   useEffect(() => {
-    // Reset for this loop iteration
     setPhase('home')
     setTypedChars(0)
     setRunClicked(false)
     setSources([])
+    setOntology(null)
     setPersonaCount(0)
     setPosts([])
     setSimRound(0)
-    setResultTab('report')
+    setResultTab('analysis')
+    setAutoSelectId(undefined)
+    setActivePlatform(undefined)
     setVisible(true)
 
     const timers: ReturnType<typeof setTimeout>[] = []
@@ -360,99 +698,76 @@ export function LandingDemoWindow() {
     }
 
     // ── Phase 1: Home ──────────────────────────────────────────────────────
-    // Type first 80 chars one by one, then jump to full
     for (let i = 1; i <= 80; i++) {
       at(55, () => setTypedChars(c => c + 1))
     }
     at(150, () => setTypedChars(DEMO_INPUT.length))
-
-    // Run button click animation
     at(1000, () => setRunClicked(true))
-
-    // Fade out → transition to simulate
     at(400, () => setVisible(false))
-    at(300, () => {
-      setPhase('simulate')
-      setVisible(true)
-    })
+    at(300, () => { setPhase('simulate'); setVisible(true) })
 
     // ── Phase 2: Simulation ────────────────────────────────────────────────
-    // Sources appear one by one (prepend — newest on top)
     MOCK_SOURCES.forEach((src, i) => {
-      at(i === 0 ? 350 : 320, () => {
-        setSources(prev => [src, ...prev])
-      })
+      at(i === 0 ? 350 : 320, () => setSources(prev => [src, ...prev]))
     })
-
-    // Clear sources, start persona generation
-    at(500, () => setSources([]))
+    at(500, () => { setSources([]); setOntology(MOCK_ONTOLOGY) })
+    at(800, () => setAutoSelectId('e0'))   // Noosphere 선택
+    at(2500, () => setAutoSelectId('e1'))  // Multi-Agent Simulation 으로 전환
+    at(2500, () => setAutoSelectId('e3'))  // Pre-launch Validation 으로 전환
     MOCK_PERSONAS.forEach((_p, i) => {
-      at(i === 0 ? 350 : 260, () => {
-        setPersonaCount(prev => prev + 1)
-      })
+      at(i === 0 ? 350 : 260, () => setPersonaCount(prev => prev + 1))
     })
 
-    // Round 1 posts
     at(500, () => setSimRound(1))
     for (let i = 0; i < 6; i++) {
       const p = MOCK_POSTS[i]
       at(i === 0 ? 280 : 420, () => {
         setPosts(prev => [...prev, {
-          id: `demo-1-${i}`,
-          platform: p.platform,
-          author_node_id: `n${i}`,
-          author_name: p.author_name,
-          content: p.content,
-          action_type: p.action_type,
-          round_num: 1,
-          upvotes: 30 + i * 11,
-          downvotes: i % 3 === 0 ? 1 : 0,
-          parent_id: null,
+          id: `demo-1-${i}`, platform: p.platform,
+          author_node_id: `n${i}`, author_name: p.author_name,
+          content: p.content, action_type: p.action_type,
+          round_num: 1, upvotes: 30 + i * 11,
+          downvotes: i % 3 === 0 ? 1 : 0, parent_id: null,
         }])
       })
     }
 
-    // Round 2 posts
+    // 플랫폼 탭 순환 (round 1 포스트가 다 쌓인 뒤)
+    at(600,  () => setActivePlatform('producthunt'))
+    at(1100, () => setActivePlatform('indiehackers'))
+    at(1100, () => setActivePlatform('reddit_startups'))
+    at(1100, () => setActivePlatform('linkedin'))
+    at(1100, () => setActivePlatform('hackernews'))
+
     at(500, () => setSimRound(2))
     for (let i = 6; i < 10; i++) {
       const p = MOCK_POSTS[i % MOCK_POSTS.length]
       at(i === 6 ? 280 : 380, () => {
         setPosts(prev => [...prev, {
-          id: `demo-2-${i}`,
-          platform: p.platform,
-          author_node_id: `n${i}`,
-          author_name: p.author_name,
-          content: p.content,
-          action_type: p.action_type,
-          round_num: 2,
-          upvotes: 20 + i * 8,
-          downvotes: 0,
-          parent_id: null,
+          id: `demo-2-${i}`, platform: p.platform,
+          author_node_id: `n${i}`, author_name: p.author_name,
+          content: p.content, action_type: p.action_type,
+          round_num: 2, upvotes: 20 + i * 8,
+          downvotes: 0, parent_id: null,
         }])
       })
     }
 
-    // Fade out → results
-    at(700, () => setVisible(false))
-    at(300, () => {
-      setPhase('results')
-      setResultTab('report')
-      setVisible(true)
-    })
-
     // ── Phase 3: Results ───────────────────────────────────────────────────
-    at(3200, () => setResultTab('feed'))
-    at(3000, () => setResultTab('analysis'))
-    at(2800, () => setVisible(false))
-
-    // Restart loop
+    at(700, () => setVisible(false))
+    at(300, () => { setPhase('results'); setResultTab('analysis'); setVisible(true) })
+    at(2500, () => setResultTab('report'))
+    at(2500, () => setResultTab('feed'))
+    at(2500, () => setResultTab('personas'))
+    at(2500, () => setResultTab('sources'))
+    at(2500, () => setVisible(false))
     at(400, () => setLoopCount(c => c + 1))
 
     return () => timers.forEach(clearTimeout)
   }, [loopCount])
 
-  const displayText  = DEMO_INPUT.slice(0, typedChars)
-  const personaPct   = Math.min(100, (personaCount / MOCK_PERSONAS.length) * 100)
+  const displayText = DEMO_INPUT.slice(0, typedChars)
+  const personaPct  = Math.min(100, (personaCount / MOCK_PERSONAS.length) * 100)
 
   return (
     <div style={{
@@ -464,7 +779,7 @@ export function LandingDemoWindow() {
       pointerEvents: 'none',
       userSelect: 'none',
     }}>
-      {/* Top bar — traffic-light dots only, no label */}
+      {/* Browser chrome — traffic-light dots */}
       <div style={{
         background: '#f8fafc',
         borderBottom: '1px solid #e2e8f0',
@@ -487,7 +802,7 @@ export function LandingDemoWindow() {
 
       {/* Content area — fixed height, clipped */}
       <div style={{
-        height: 460,
+        height: 580,
         overflow: 'hidden',
         opacity: visible ? 1 : 0,
         transition: 'opacity 0.3s ease',
@@ -502,6 +817,9 @@ export function LandingDemoWindow() {
             personaPct={personaPct}
             posts={posts}
             simRound={simRound}
+            ontology={ontology}
+            autoSelectId={autoSelectId}
+            activePlatform={activePlatform}
           />
         )}
         {phase === 'results' && (
