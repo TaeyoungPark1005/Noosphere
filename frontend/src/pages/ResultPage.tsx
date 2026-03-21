@@ -6,9 +6,10 @@ import { PersonaCardView } from '../components/PersonaCardView'
 import { ReportView } from '../components/ReportView'
 import { getResults } from '../api'
 import { MarkdownView } from '../components/MarkdownView'
+import { SourcesView } from '../components/SourcesView'
 import type { SimResults } from '../types'
 
-type Tab = 'analysis' | 'report' | 'feed' | 'personas'
+type Tab = 'analysis' | 'report' | 'feed' | 'personas' | 'sources'
 
 export function ResultPage() {
   const { simId } = useParams<{ simId: string }>()
@@ -33,6 +34,7 @@ export function ResultPage() {
     { id: 'report', label: 'Simulation' },
     { id: 'feed', label: 'Social Feed' },
     { id: 'personas', label: 'Personas' },
+    { id: 'sources', label: 'Sources' },
   ]
 
   return (
@@ -95,6 +97,9 @@ export function ResultPage() {
               )}
               {tab === 'personas' && (
                 <PersonaCardView personas={results.personas_json} />
+              )}
+              {tab === 'sources' && (
+                <SourcesView sources={results.sources_json ?? []} />
               )}
             </div>
           </>
