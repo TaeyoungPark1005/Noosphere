@@ -65,32 +65,38 @@ async def build_ontology(
         if not raw:
             raise ValueError("Empty response")
         parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            raise ValueError(f"Expected dict, got {type(parsed).__name__}")
+
+        # Assign IDs backend-side
+        raw_entities = parsed.get("entities", [])
+        if not isinstance(raw_entities, list):
+            raw_entities = []
+        entities = _assign_ids(raw_entities)
+
+        # Resolve relationship from_name/to_name → entity IDs
+        name_to_id = {e["name"].lower(): e["id"] for e in entities if isinstance(e.get("name"), str)}
+        relationships = []
+        for rel in parsed.get("relationships", []):
+            if not isinstance(rel, dict):
+                continue
+            from_id = name_to_id.get((rel.get("from_name") or "").lower())
+            to_id = name_to_id.get((rel.get("to_name") or "").lower())
+            if from_id and to_id and rel.get("type") in RELATIONSHIP_TYPES:
+                relationships.append({"from": from_id, "to": to_id, "type": rel["type"]})
+
+        entities = _assign_source_node_ids(entities, context_nodes)
+
+        return {
+            "domain_summary": str(parsed.get("domain_summary", ""))[:200],
+            "entities": entities,
+            "relationships": relationships,
+            "market_tensions": [str(t) for t in parsed.get("market_tensions", [])[:5]],
+            "key_trends": [str(t) for t in parsed.get("key_trends", [])[:5]],
+        }
     except Exception as exc:
         logger.warning("build_ontology failed: %s", exc)
         return None
-
-    # Assign IDs backend-side
-    raw_entities = parsed.get("entities", [])
-    entities = _assign_ids(raw_entities)
-
-    # Resolve relationship from_name/to_name → entity IDs
-    name_to_id = {e["name"].lower(): e["id"] for e in entities}
-    relationships = []
-    for rel in parsed.get("relationships", []):
-        from_id = name_to_id.get((rel.get("from_name") or "").lower())
-        to_id = name_to_id.get((rel.get("to_name") or "").lower())
-        if from_id and to_id and rel.get("type") in RELATIONSHIP_TYPES:
-            relationships.append({"from": from_id, "to": to_id, "type": rel["type"]})
-
-    entities = _assign_source_node_ids(entities, context_nodes)
-
-    return {
-        "domain_summary": str(parsed.get("domain_summary", ""))[:200],
-        "entities": entities,
-        "relationships": relationships,
-        "market_tensions": [str(t) for t in parsed.get("market_tensions", [])[:5]],
-        "key_trends": [str(t) for t in parsed.get("key_trends", [])[:5]],
-    }
 
 
 def _assign_ids(entities: list[dict]) -> list[dict]:

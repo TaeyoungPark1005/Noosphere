@@ -71,3 +71,95 @@ def test_ontology_for_content_under_600_chars():
     assert len(result) <= 600
     assert "LangChain" in result
     assert "integrates_with" in result or "Pinecone" in result
+
+
+import pytest
+from unittest.mock import AsyncMock, patch
+
+
+@pytest.mark.asyncio
+async def test_build_ontology_returns_dict_on_valid_response():
+    """build_ontology returns a dict with expected keys on valid LLM response."""
+    from backend.ontology_builder import build_ontology
+    from backend.llm import LLMResponse
+
+    fake_json = '{"domain_summary": "AI tooling", "entities": [{"name": "LangChain", "type": "framework"}], "relationships": [], "market_tensions": ["cost vs quality"], "key_trends": ["LLM adoption"]}'
+    mock_response = LLMResponse(content=fake_json, tool_name=None, tool_args=None)
+
+    with patch("backend.ontology_builder.llm") as mock_llm:
+        mock_llm.complete = AsyncMock(return_value=mock_response)
+        result = await build_ontology(
+            context_nodes=[{"id": "n1", "title": "LangChain Python library", "source": "github", "abstract": "..."}],
+            input_text="RAG app",
+            provider="openai",
+        )
+
+    assert result is not None
+    assert result["domain_summary"] == "AI tooling"
+    assert len(result["entities"]) == 1
+    assert result["entities"][0]["id"] == "e0"
+    assert "n1" in result["entities"][0]["source_node_ids"]
+
+
+@pytest.mark.asyncio
+async def test_build_ontology_returns_none_on_malformed_json():
+    """build_ontology returns None when LLM response is not valid JSON."""
+    from backend.ontology_builder import build_ontology
+    from backend.llm import LLMResponse
+
+    mock_response = LLMResponse(content="not json at all {{{", tool_name=None, tool_args=None)
+
+    with patch("backend.ontology_builder.llm") as mock_llm:
+        mock_llm.complete = AsyncMock(return_value=mock_response)
+        result = await build_ontology(
+            context_nodes=[],
+            input_text="test",
+            provider="openai",
+        )
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_build_ontology_returns_none_when_parsed_is_not_dict():
+    """build_ontology returns None when LLM returns a JSON array instead of object."""
+    from backend.ontology_builder import build_ontology
+    from backend.llm import LLMResponse
+
+    mock_response = LLMResponse(content='[{"name": "oops"}]', tool_name=None, tool_args=None)
+
+    with patch("backend.ontology_builder.llm") as mock_llm:
+        mock_llm.complete = AsyncMock(return_value=mock_response)
+        result = await build_ontology(
+            context_nodes=[],
+            input_text="test",
+            provider="openai",
+        )
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_build_ontology_resolves_relationship_names_to_ids():
+    """build_ontology correctly resolves from_name/to_name to entity IDs."""
+    from backend.ontology_builder import build_ontology
+    from backend.llm import LLMResponse
+
+    fake_json = '''{
+        "domain_summary": "test",
+        "entities": [{"name": "Alpha", "type": "framework"}, {"name": "Beta", "type": "product"}],
+        "relationships": [{"from_name": "Alpha", "to_name": "Beta", "type": "competes_with"}],
+        "market_tensions": [],
+        "key_trends": []
+    }'''
+    mock_response = LLMResponse(content=fake_json, tool_name=None, tool_args=None)
+
+    with patch("backend.ontology_builder.llm") as mock_llm:
+        mock_llm.complete = AsyncMock(return_value=mock_response)
+        result = await build_ontology(context_nodes=[], input_text="test", provider="openai")
+
+    assert result is not None
+    assert len(result["relationships"]) == 1
+    assert result["relationships"][0]["from"] == "e0"
+    assert result["relationships"][0]["to"] == "e1"
+    assert result["relationships"][0]["type"] == "competes_with"
