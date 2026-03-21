@@ -43,3 +43,12 @@ async def test_run_simulation_empty_nodes_yields_error():
         events.append(event)
 
     assert events[0]["type"] == "sim_error"
+
+
+@pytest.mark.asyncio
+async def test_run_simulation_accepts_ontology_param():
+    """run_simulation should accept ontology kwarg without error."""
+    from backend.simulation.social_runner import run_simulation
+    import inspect
+    sig = inspect.signature(run_simulation)
+    assert 'ontology' in sig.parameters

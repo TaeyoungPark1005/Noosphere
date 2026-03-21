@@ -27,6 +27,7 @@ async def run_simulation(
     edges: list[dict] | None = None,
     activation_rate: float = 0.25,
     provider: str = "openai",
+    ontology: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
     nodes = context_nodes  # alias for rest of function body
     idea_text = input_text  # alias for rest of function body
@@ -59,6 +60,7 @@ async def run_simulation(
             adjacency=adjacency, id_to_node=id_to_node,
             platform_name=platform_name,
             provider=provider,
+            ontology=ontology,
         ):
             persona = event.pop("_persona", None)
             if persona is not None:
@@ -121,6 +123,7 @@ async def run_simulation(
             async for event in platform_round(
                 plat, state, plat_personas, degree, idea_text, rn, language, activation_rate,
                 provider=provider,
+                ontology=ontology,
             ):
                 events_out.append(event)
             return events_out
