@@ -2,7 +2,13 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '../components/Header'
 import { startSimulation } from '../api'
-import type { Platform, SimConfig } from '../types'
+import type { Platform, Provider, SimConfig } from '../types'
+
+const PROVIDER_OPTIONS: Array<{ id: Provider; label: string; description: string }> = [
+  { id: 'openai',    label: 'GPT',    description: 'OpenAI GPT-5.4' },
+  { id: 'anthropic', label: 'Claude', description: 'Anthropic Claude' },
+  { id: 'gemini',    label: 'Gemini', description: 'Google Gemini' },
+]
 
 const PLATFORM_OPTIONS: Array<{ id: Platform; label: string; icon: string }> = [
   { id: 'hackernews',      label: 'Hacker News',       icon: '🟠' },
@@ -75,6 +81,7 @@ const DEFAULT_CONFIG: Omit<SimConfig, 'input_text'> = {
   platforms: ['hackernews', 'producthunt', 'indiehackers', 'reddit_startups', 'linkedin'],
   activation_rate: 0.25,
   source_limits: DEFAULT_SOURCE_LIMITS,
+  provider: 'openai',
 }
 
 type OptionsTab = 'simulation' | 'research'
@@ -375,6 +382,37 @@ export function HomePage() {
               )}
             </div>
           )}
+        </div>
+
+        {/* Provider selector */}
+        <div style={{ marginTop: 20, animation: 'fadeInUp 0.55s ease both' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: 10 }}>
+            AI Provider
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {PROVIDER_OPTIONS.map(p => {
+              const active = config.provider === p.id
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setConfig(c => ({ ...c, provider: p.id }))}
+                  className="platform-btn"
+                  title={p.description}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '7px 16px', fontSize: 13, borderRadius: 8, cursor: 'pointer',
+                    border: '1.5px solid',
+                    background: active ? '#1e293b' : '#fff',
+                    color: active ? '#fff' : '#475569',
+                    borderColor: active ? '#1e293b' : '#e2e8f0',
+                    fontWeight: active ? 600 : 400,
+                    boxShadow: active ? '0 2px 8px rgba(30,41,59,0.25)' : 'none',
+                  }}>
+                  {p.label}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {error && (

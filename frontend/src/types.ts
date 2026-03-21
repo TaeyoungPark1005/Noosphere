@@ -5,6 +5,8 @@ export type Platform =
   | 'reddit_startups'
   | 'linkedin'
 
+export type Provider = 'openai' | 'anthropic' | 'gemini'
+
 export interface SimConfig {
   input_text: string
   language: string
@@ -13,6 +15,7 @@ export interface SimConfig {
   platforms: Platform[]
   activation_rate: number
   source_limits: Record<string, number>
+  provider: Provider
 }
 
 export interface SocialPost {
@@ -77,7 +80,7 @@ export interface HistoryItem {
   created_at: string
   input_text_snippet: string
   language: string
-  config: SimConfig
+  config: SimConfig & { provider?: Provider }
   status: 'running' | 'completed' | 'failed'
   domain: string
 }
