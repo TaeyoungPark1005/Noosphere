@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Header } from '../components/Header'
 import { useSimulation } from '../hooks/useSimulation'
 import { PlatformSimFeed } from '../components/PlatformSimFeed'
+import { OntologyGraph } from '../components/OntologyGraph'
 import { SOURCE_COLORS } from '../constants'
 import type { Platform } from '../types'
 
@@ -167,6 +168,19 @@ export function SimulatePage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Ecosystem Map — shown when ontology is available, after sourcing phase */}
+        {sim.ontology && (
+          <div style={{ marginBottom: 32, animation: 'fadeInUp 0.4s ease' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 12px', letterSpacing: '-0.02em' }}>
+              Ecosystem Map
+            </h3>
+            <OntologyGraph
+              data={sim.ontology}
+              contextNodes={[]}
+            />
           </div>
         )}
 
