@@ -12,6 +12,7 @@ from backend.simulation.graph_utils import get_neighbor_titles
 from backend.simulation.platforms.base import AbstractPlatform, AgentAction
 from backend import llm
 from backend.llm import LLMToolRequired
+from backend.ontology_builder import ontology_for_persona, ontology_for_action, ontology_for_content
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ async def generate_seed_post(
             ],
             tier="mid",
             provider=provider,
-            max_tokens=512,
+            max_tokens=2048,
             tools=[tool],
             tool_choice=tool_name,
         )
@@ -135,6 +136,7 @@ async def decide_action(
     feed_text: str,
     language: str = "English",
     provider: str = "openai",
+    ontology: dict | None = None,
 ) -> AgentAction:
     """LLM call 1: decide action_type and target_post_id."""
     allowed = platform.get_allowed_actions(persona)
@@ -149,6 +151,8 @@ async def decide_action(
         f"For vote/react actions, pick a target_post_id from the feed. "
         f"For new content, target_post_id can be null (new top-level) or a post id (reply)."
     )
+    if ontology:
+        prompt += f"\nEcosystem context:\n{ontology_for_action(ontology)}"
     try:
         response = await llm.complete(
             messages=[
@@ -157,7 +161,7 @@ async def decide_action(
             ],
             tier="low",
             provider=provider,
-            max_tokens=128,
+            max_tokens=512,
             tools=[_DECIDE_ACTION_TOOL],
             tool_choice="decide_action",
         )
@@ -184,6 +188,7 @@ async def generate_content(
     idea_text: str,
     language: str = "English",
     provider: str = "openai",
+    ontology: dict | None = None,
 ) -> tuple[str, dict]:
     """LLM call 2: generate post/comment text. Returns (content_str, structured_data)."""
     tool = _to_openai_tool(platform.content_tool(action.action_type))
@@ -200,15 +205,17 @@ async def generate_content(
         f"{feed_text}\n\n"
         f"Write your {action.action_type} in {language}. Be authentic to your persona and the platform style."
     )
+    if ontology:
+        prompt += f"\nEcosystem context:\n{ontology_for_content(ontology)}"
     try:
         response = await llm.complete(
             messages=[
                 {"role": "system", "content": platform.system_prompt},
                 {"role": "user", "content": prompt},
             ],
-            tier="low",
+            tier="mid",
             provider=provider,
-            max_tokens=512,
+            max_tokens=2048,
             tools=[tool],
             tool_choice=tool_name,
         )
@@ -232,6 +239,7 @@ async def round_personas(
     id_to_node: dict | None = None,
     platform_name: str = "",
     provider: str = "openai",
+    ontology: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
     """Generate personas for all nodes for a specific platform. Yields sim_persona events."""
     sem = asyncio.Semaphore(concurrency)
@@ -251,6 +259,7 @@ async def round_personas(
                     neighbor_titles=neighbor_titles,
                     platform_name=platform_name,
                     provider=provider,
+                    ontology=ontology,
                 )
                 await queue.put({
                     "type": "sim_persona",
@@ -304,6 +313,7 @@ async def platform_round(
     language: str = "English",
     activation_rate: float = 0.25,
     provider: str = "openai",
+    ontology: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
     """Run one round for a single platform. Yields streaming events."""
     active = select_active_agents(personas, degree, activation_rate)
@@ -312,10 +322,13 @@ async def platform_round(
 
     for persona in active:
         feed_text = platform.build_feed(state)
-        action = await decide_action(persona, platform, feed_text, language, provider=provider)
+        action = await decide_action(persona, platform, feed_text, language, provider=provider, ontology=ontology)
 
         if platform.requires_content(action.action_type):
-            content, structured_data = await generate_content(persona, action, platform, feed_text, idea_text, language, provider=provider)
+            content, structured_data = await generate_content(
+                persona, action, platform, feed_text, idea_text, language,
+                provider=provider, ontology=ontology
+            )
             post = SocialPost(
                 id=str(uuid.uuid4()),
                 platform=platform.name,
@@ -494,7 +507,7 @@ async def generate_report(
             ],
             tier="high",
             provider=provider,
-            max_tokens=4096,
+            max_tokens=16384,
             timeout=300.0,
             tools=[_REPORT_TOOL],
             tool_choice="create_report",
