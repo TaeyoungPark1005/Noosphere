@@ -493,8 +493,11 @@ async def test_acquire_tpm_slot_called_before_openai_request():
         call_order.append("tpm_acquire")
         return "res-id"
 
+    async def fake_acquire_api_slot(*args, **kwargs):
+        call_order.append("api_slot_acquire")
+
     with patch("backend.llm._get_openai_client", return_value=mock_client), \
-         patch("backend.llm.acquire_api_slot", new_callable=AsyncMock), \
+         patch("backend.llm.acquire_api_slot", side_effect=fake_acquire_api_slot), \
          patch("backend.llm.acquire_tpm_slot", side_effect=fake_acquire_tpm), \
          patch("backend.llm.record_token_usage", new_callable=AsyncMock), \
          patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
@@ -504,7 +507,7 @@ async def test_acquire_tpm_slot_called_before_openai_request():
             provider="openai",
             max_tokens=200,
         )
-    assert call_order.index("tpm_acquire") < call_order.index("api_call")
+    assert call_order == ["tpm_acquire", "api_slot_acquire", "api_call"]
 
 
 async def test_record_token_usage_called_with_actual_tokens_openai():

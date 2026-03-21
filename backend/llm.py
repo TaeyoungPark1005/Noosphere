@@ -147,7 +147,7 @@ async def _complete_openai(
     reservation_id = await acquire_tpm_slot("openai", max_tokens)
 
     for attempt in range(4):
-        await acquire_api_slot()
+        await acquire_api_slot("openai")
         try:
             response = await asyncio.wait_for(
                 client.chat.completions.create(**kwargs),
