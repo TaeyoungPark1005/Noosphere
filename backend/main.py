@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import redis.asyncio as aioredis
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
@@ -19,6 +19,7 @@ from backend.db import (
     init_db, create_simulation, update_simulation_status,
     get_sim_results, list_history, get_simulation, DB_PATH,
     count_active_simulations, reconcile_stale_simulations, request_simulation_cancel,
+    get_checkpoint,
 )
 from backend.tasks import run_simulation_task, STREAM_KEY
 
@@ -128,31 +129,35 @@ async def simulate(config: SimConfig):
 
 
 @app.get("/simulate-stream/{sim_id}")
-async def simulate_stream(sim_id: str):
-    """SSE stream backed by Redis Streams."""
+async def simulate_stream(sim_id: str, request: Request, last_id: str = "0"):
+    """SSE stream backed by Redis Streams.
+    last_id: Redis stream ID to resume from (pass "0" to replay all, omit for default).
+    """
     sim = get_simulation(DB_PATH, sim_id)
     if not sim:
         raise HTTPException(404, "Simulation not found")
 
     stream_key = STREAM_KEY.format(sim_id)
+    start_id = last_id or "0"
 
     async def event_generator():
         r = aioredis.from_url(REDIS_URL, decode_responses=True)
-        last_id = "0"  # 처음부터 읽기 (재연결 시에도 전체 이벤트 재생)
+        current_id = start_id
         try:
             while True:
-                # 30초 블로킹 대기
-                results = await r.xread({stream_key: last_id}, count=100, block=30_000)
+                results = await r.xread({stream_key: current_id}, count=100, block=30_000)
                 if not results:
                     yield 'data: {"type":"heartbeat"}\n\n'
                     continue
                 for _stream_name, messages in results:
                     for msg_id, fields in messages:
-                        last_id = msg_id
+                        current_id = msg_id
                         raw = fields["data"]
-                        yield f"data: {raw}\n\n"
+                        yield f"id: {msg_id}\ndata: {raw}\n\n"
                         if json.loads(raw).get("type") == "sim_done":
                             return
+        except Exception:
+            return
         finally:
             await r.aclose()
 
@@ -169,6 +174,49 @@ async def get_results(sim_id: str):
     if not results:
         raise HTTPException(404, "Results not found")
     return results
+
+
+@app.get("/simulate/{sim_id}/status")
+async def simulation_status(sim_id: str):
+    """Return current simulation status and last checkpointed round."""
+    sim = get_simulation(DB_PATH, sim_id)
+    if not sim:
+        raise HTTPException(404, "Simulation not found")
+    checkpoint = get_checkpoint(DB_PATH, sim_id)
+    return {
+        "status": sim["status"],
+        "last_round": checkpoint["last_round"] if checkpoint else 0,
+    }
+
+
+@app.post("/simulate/{sim_id}/resume")
+async def resume_simulation(sim_id: str):
+    """Resume a failed simulation from its last checkpoint."""
+    sim = get_simulation(DB_PATH, sim_id)
+    if not sim:
+        raise HTTPException(404, "Simulation not found")
+    if sim["status"] != "failed":
+        raise HTTPException(400, f"Only failed simulations can be resumed (status: {sim['status']})")
+    checkpoint = get_checkpoint(DB_PATH, sim_id)
+    if not checkpoint:
+        raise HTTPException(409, "No checkpoint available; start a new simulation")
+
+    # Atomic guard: only succeeds if status is still 'failed'
+    updated = update_simulation_status(
+        DB_PATH, sim_id, "running",
+        allowed_current_statuses={"failed"},
+    )
+    if not updated:
+        raise HTTPException(409, "Simulation state changed; try again")
+
+    config = json.loads(sim["config_json"])
+    try:
+        run_simulation_task.apply_async(args=[sim_id, config], task_id=sim_id)
+    except Exception:
+        update_simulation_status(DB_PATH, sim_id, "failed", allowed_current_statuses={"running"})
+        raise
+
+    return {"sim_id": sim_id, "resuming_from_round": checkpoint["last_round"] + 1}
 
 
 @app.get("/history")
