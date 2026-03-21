@@ -1,36 +1,19 @@
 from __future__ import annotations
 import asyncio
 import dataclasses
-import json
 import logging
-import os
 import random
 import uuid
 from collections.abc import AsyncGenerator
-from typing import Any
-
-import openai
 
 from backend.simulation.models import Persona, SocialPost, PlatformState
 from backend.simulation.persona_generator import generate_persona
 from backend.simulation.graph_utils import get_neighbor_titles
 from backend.simulation.platforms.base import AbstractPlatform, AgentAction
+from backend import llm
+from backend.llm import LLMToolRequired
 
 logger = logging.getLogger(__name__)
-
-_client: openai.AsyncOpenAI | None = None
-
-from backend.simulation.rate_limiter import api_sem as _api_sem  # noqa: E402
-
-
-def _get_client() -> openai.AsyncOpenAI:
-    global _client
-    if _client is None:
-        api_key = os.environ.get("OPENAI_API_KEY", "")
-        if not api_key:
-            raise RuntimeError("OPENAI_API_KEY environment variable is not set.")
-        _client = openai.AsyncOpenAI(api_key=api_key, timeout=60.0)
-    return _client
 
 
 def _to_openai_tool(tool: dict) -> dict:
@@ -42,41 +25,6 @@ def _to_openai_tool(tool: dict) -> dict:
             "parameters": tool["input_schema"],
         }
     }
-
-
-def _parse_tool_arguments(message: Any, *, expected_name: str) -> dict:
-    tool_calls = getattr(message, "tool_calls", None) or []
-    if not tool_calls:
-        raise ValueError(f"No tool_calls in {expected_name} response")
-
-    function = getattr(tool_calls[0], "function", None)
-    if function is None:
-        raise ValueError(f"Tool call missing function metadata in {expected_name} response")
-    if function.name != expected_name:
-        raise ValueError(f"Unexpected tool call {function.name!r}, expected {expected_name!r}")
-    if not function.arguments:
-        raise ValueError(f"Empty tool arguments in {expected_name} response")
-
-    data = json.loads(function.arguments)
-    if not isinstance(data, dict):
-        raise ValueError(f"{expected_name} tool arguments must decode to an object")
-    return data
-
-
-async def _create_message(**kwargs):
-    """Wrapper around client.chat.completions.create with semaphore + 429 retry."""
-    client = _get_client()
-    for attempt in range(4):
-        async with _api_sem:
-            try:
-                return await client.chat.completions.create(**kwargs)
-            except openai.RateLimitError:
-                if attempt == 3:
-                    raise
-                wait = 5 * (2 ** attempt)  # 5s, 10s, 20s
-                logger.warning("Rate limit hit, retrying in %ds (attempt %d/4)", wait, attempt + 1)
-        await asyncio.sleep(wait)
-    raise RuntimeError("Unreachable")
 
 
 # ── 에이전트 선정 ─────────────────────────────────────────────────────────────
@@ -112,9 +60,11 @@ async def generate_seed_post(
     platform: AbstractPlatform,
     idea_text: str,
     language: str = "English",
+    provider: str = "openai",
 ) -> SocialPost:
     """Generate the initial post for a platform that kicks off discussion."""
     tool = _to_openai_tool(platform.seed_tool())
+    tool_name = tool["function"]["name"]
     prompt = (
         f"Introduce the following idea on {platform.name}. "
         f"Match the platform's tone and style exactly. Write in {language}.\n\n"
@@ -123,21 +73,21 @@ async def generate_seed_post(
     structured_data: dict = {}
     content = f"[{platform.name}] Introducing: {idea_text[:200]}"
     try:
-        msg = await _create_message(
-            model="gpt-5.4-mini",
-            max_tokens=512,
+        response = await llm.complete(
             messages=[
                 {"role": "system", "content": platform.system_prompt},
                 {"role": "user", "content": prompt},
             ],
+            tier="mid",
+            provider=provider,
+            max_tokens=512,
             tools=[tool],
-            tool_choice={"type": "function", "function": {"name": tool["function"]["name"]}},
+            tool_choice=tool_name,
         )
-        structured_data = _parse_tool_arguments(
-            msg.choices[0].message,
-            expected_name=tool["function"]["name"],
-        )
+        structured_data = response.tool_args or {}
         content = platform.extract_seed_content(structured_data)
+    except LLMToolRequired:
+        raise
     except Exception as exc:
         logger.warning("Seed post generation failed for %s: %s", platform.name, exc)
     return SocialPost(
@@ -184,6 +134,7 @@ async def decide_action(
     platform: AbstractPlatform,
     feed_text: str,
     language: str = "English",
+    provider: str = "openai",
 ) -> AgentAction:
     """LLM call 1: decide action_type and target_post_id."""
     allowed = platform.get_allowed_actions(persona)
@@ -199,25 +150,25 @@ async def decide_action(
         f"For new content, target_post_id can be null (new top-level) or a post id (reply)."
     )
     try:
-        msg = await _create_message(
-            model="gpt-5.4-nano",
-            max_tokens=128,
+        response = await llm.complete(
             messages=[
                 {"role": "system", "content": _ACTION_SYSTEM},
                 {"role": "user", "content": prompt},
             ],
+            tier="low",
+            provider=provider,
+            max_tokens=128,
             tools=[_DECIDE_ACTION_TOOL],
-            tool_choice={"type": "function", "function": {"name": "decide_action"}},
+            tool_choice="decide_action",
         )
-        data = _parse_tool_arguments(
-            msg.choices[0].message,
-            expected_name="decide_action",
-        )
+        data = response.tool_args or {}
         action_type = data.get("action_type", allowed[0])
         if action_type not in allowed:
             action_type = allowed[0]
         target = data.get("target_post_id") or None
         return AgentAction(action_type=action_type, target_post_id=target)
+    except LLMToolRequired:
+        raise
     except Exception as exc:
         logger.warning("decide_action failed for %s on %s: %s", persona.node_id, platform.name, exc)
         return AgentAction(action_type=allowed[0], target_post_id=f"__seed__{platform.name}")
@@ -232,9 +183,11 @@ async def generate_content(
     feed_text: str,
     idea_text: str,
     language: str = "English",
+    provider: str = "openai",
 ) -> tuple[str, dict]:
     """LLM call 2: generate post/comment text. Returns (content_str, structured_data)."""
     tool = _to_openai_tool(platform.content_tool(action.action_type))
+    tool_name = tool["function"]["name"]
     prompt = (
         f"Platform: {platform.name}\n"
         f"You are {persona.name}, {persona.role} at {persona.company} "
@@ -248,22 +201,22 @@ async def generate_content(
         f"Write your {action.action_type} in {language}. Be authentic to your persona and the platform style."
     )
     try:
-        msg = await _create_message(
-            model="gpt-5.4-nano",
-            max_tokens=512,
+        response = await llm.complete(
             messages=[
                 {"role": "system", "content": platform.system_prompt},
                 {"role": "user", "content": prompt},
             ],
+            tier="low",
+            provider=provider,
+            max_tokens=512,
             tools=[tool],
-            tool_choice={"type": "function", "function": {"name": tool["function"]["name"]}},
+            tool_choice=tool_name,
         )
-        structured_data = _parse_tool_arguments(
-            msg.choices[0].message,
-            expected_name=tool["function"]["name"],
-        )
+        structured_data = response.tool_args or {}
         content = platform.extract_content(action.action_type, structured_data)
         return content, structured_data
+    except LLMToolRequired:
+        raise
     except Exception as exc:
         logger.warning("generate_content failed for %s: %s", persona.node_id, exc)
         return f"[{persona.name}] Interesting idea.", {}
@@ -278,6 +231,7 @@ async def round_personas(
     adjacency: dict | None = None,
     id_to_node: dict | None = None,
     platform_name: str = "",
+    provider: str = "openai",
 ) -> AsyncGenerator[dict, None]:
     """Generate personas for all nodes for a specific platform. Yields sim_persona events."""
     sem = asyncio.Semaphore(concurrency)
@@ -296,6 +250,7 @@ async def round_personas(
                     idea_text=idea_text,
                     neighbor_titles=neighbor_titles,
                     platform_name=platform_name,
+                    provider=provider,
                 )
                 await queue.put({
                     "type": "sim_persona",
@@ -348,6 +303,7 @@ async def platform_round(
     round_num: int,
     language: str = "English",
     activation_rate: float = 0.25,
+    provider: str = "openai",
 ) -> AsyncGenerator[dict, None]:
     """Run one round for a single platform. Yields streaming events."""
     active = select_active_agents(personas, degree, activation_rate)
@@ -356,10 +312,10 @@ async def platform_round(
 
     for persona in active:
         feed_text = platform.build_feed(state)
-        action = await decide_action(persona, platform, feed_text, language)
+        action = await decide_action(persona, platform, feed_text, language, provider=provider)
 
         if platform.requires_content(action.action_type):
-            content, structured_data = await generate_content(persona, action, platform, feed_text, idea_text, language)
+            content, structured_data = await generate_content(persona, action, platform, feed_text, idea_text, language, provider=provider)
             post = SocialPost(
                 id=str(uuid.uuid4()),
                 platform=platform.name,
@@ -493,6 +449,7 @@ async def generate_report(
     idea_text: str,
     domain: str,
     language: str = "English",
+    provider: str = "openai",
 ) -> tuple[dict, str]:
     """Returns (report_json, report_md)."""
     platform_summaries = []
@@ -530,24 +487,21 @@ async def generate_report(
 
     report_json: dict = {}
     try:
-        api_key = os.environ.get("OPENAI_API_KEY", "")
-        if not api_key:
-            raise RuntimeError("OPENAI_API_KEY environment variable is not set.")
-        client = openai.AsyncOpenAI(api_key=api_key, timeout=300.0)
-        msg = await client.chat.completions.create(
-            model="gpt-5.4",
-            max_tokens=4096,
+        response = await llm.complete(
             messages=[
                 {"role": "system", "content": _REPORT_SYSTEM},
                 {"role": "user", "content": prompt},
             ],
+            tier="high",
+            provider=provider,
+            max_tokens=4096,
+            timeout=300.0,
             tools=[_REPORT_TOOL],
-            tool_choice={"type": "function", "function": {"name": "create_report"}},
+            tool_choice="create_report",
         )
-        report_json = _parse_tool_arguments(
-            msg.choices[0].message,
-            expected_name="create_report",
-        )
+        report_json = response.tool_args or {}
+    except LLMToolRequired:
+        raise
     except Exception as exc:
         logger.warning("Report generation failed: %s", exc)
 
