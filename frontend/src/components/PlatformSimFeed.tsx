@@ -29,7 +29,14 @@ export function PlatformSimFeed({ postsByPlatform, ideaText = '' }: Props) {
   const tab = activeTab ?? activePlatforms[0] ?? null
   const posts = tab ? (postsByPlatform[tab] ?? []) : []
 
-  if (activePlatforms.length === 0) return null
+  if (activePlatforms.length === 0) {
+    return (
+      <div style={{ padding: 48, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+        <div style={{ fontSize: 28, marginBottom: 12 }}>💬</div>
+        No posts available.
+      </div>
+    )
+  }
 
   return (
     <div>

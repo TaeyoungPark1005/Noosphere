@@ -85,7 +85,7 @@ export function ResultPage() {
 
             <div key={tab} className="tab-content">
               {tab === 'analysis' && (
-                <MarkdownView content={results.analysis_md || '_분석 보고서 없음_'} />
+                <MarkdownView content={results.analysis_md} />
               )}
               {tab === 'report' && (
                 <ReportView report={results.report_json} simId={simId!} />

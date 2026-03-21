@@ -7,6 +7,7 @@ import os
 import random
 import uuid
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import openai
 
@@ -41,6 +42,25 @@ def _to_openai_tool(tool: dict) -> dict:
             "parameters": tool["input_schema"],
         }
     }
+
+
+def _parse_tool_arguments(message: Any, *, expected_name: str) -> dict:
+    tool_calls = getattr(message, "tool_calls", None) or []
+    if not tool_calls:
+        raise ValueError(f"No tool_calls in {expected_name} response")
+
+    function = getattr(tool_calls[0], "function", None)
+    if function is None:
+        raise ValueError(f"Tool call missing function metadata in {expected_name} response")
+    if function.name != expected_name:
+        raise ValueError(f"Unexpected tool call {function.name!r}, expected {expected_name!r}")
+    if not function.arguments:
+        raise ValueError(f"Empty tool arguments in {expected_name} response")
+
+    data = json.loads(function.arguments)
+    if not isinstance(data, dict):
+        raise ValueError(f"{expected_name} tool arguments must decode to an object")
+    return data
 
 
 async def _create_message(**kwargs):
@@ -113,10 +133,11 @@ async def generate_seed_post(
             tools=[tool],
             tool_choice={"type": "function", "function": {"name": tool["function"]["name"]}},
         )
-        tool_calls = msg.choices[0].message.tool_calls
-        if tool_calls:
-            structured_data = json.loads(tool_calls[0].function.arguments)
-            content = platform.extract_seed_content(structured_data)
+        structured_data = _parse_tool_arguments(
+            msg.choices[0].message,
+            expected_name=tool["function"]["name"],
+        )
+        content = platform.extract_seed_content(structured_data)
     except Exception as exc:
         logger.warning("Seed post generation failed for %s: %s", platform.name, exc)
     return SocialPost(
@@ -188,10 +209,10 @@ async def decide_action(
             tools=[_DECIDE_ACTION_TOOL],
             tool_choice={"type": "function", "function": {"name": "decide_action"}},
         )
-        tool_calls = msg.choices[0].message.tool_calls
-        if not tool_calls:
-            raise ValueError("No tool_calls in decide_action response")
-        data: dict = json.loads(tool_calls[0].function.arguments)
+        data = _parse_tool_arguments(
+            msg.choices[0].message,
+            expected_name="decide_action",
+        )
         action_type = data.get("action_type", allowed[0])
         if action_type not in allowed:
             action_type = allowed[0]
@@ -237,10 +258,10 @@ async def generate_content(
             tools=[tool],
             tool_choice={"type": "function", "function": {"name": tool["function"]["name"]}},
         )
-        tool_calls = msg.choices[0].message.tool_calls
-        if not tool_calls:
-            raise ValueError("No tool_calls in generate_content response")
-        structured_data = json.loads(tool_calls[0].function.arguments)
+        structured_data = _parse_tool_arguments(
+            msg.choices[0].message,
+            expected_name=tool["function"]["name"],
+        )
         content = platform.extract_content(action.action_type, structured_data)
         return content, structured_data
     except Exception as exc:
@@ -509,10 +530,10 @@ async def generate_report(
 
     report_json: dict = {}
     try:
-        client = openai.AsyncOpenAI(
-            api_key=os.environ.get("OPENAI_API_KEY", ""),
-            timeout=300.0,
-        )
+        api_key = os.environ.get("OPENAI_API_KEY", "")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY environment variable is not set.")
+        client = openai.AsyncOpenAI(api_key=api_key, timeout=300.0)
         msg = await client.chat.completions.create(
             model="gpt-5.4",
             max_tokens=4096,
@@ -523,10 +544,10 @@ async def generate_report(
             tools=[_REPORT_TOOL],
             tool_choice={"type": "function", "function": {"name": "create_report"}},
         )
-        tool_calls = msg.choices[0].message.tool_calls
-        if not tool_calls:
-            raise ValueError("No tool_calls in report response")
-        report_json = json.loads(tool_calls[0].function.arguments)
+        report_json = _parse_tool_arguments(
+            msg.choices[0].message,
+            expected_name="create_report",
+        )
     except Exception as exc:
         logger.warning("Report generation failed: %s", exc)
 

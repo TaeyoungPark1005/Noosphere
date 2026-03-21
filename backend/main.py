@@ -103,7 +103,7 @@ async def simulate(config: SimConfig):
     create_simulation(DB_PATH, sim_id, config.input_text, config.language,
                       config.model_dump(), "")
 
-    run_simulation_task.delay(sim_id, config.model_dump())
+    run_simulation_task.apply_async(args=[sim_id, config.model_dump()], task_id=sim_id)
     return {"sim_id": sim_id}
 
 

@@ -43,6 +43,14 @@ def _get_client() -> openai.AsyncOpenAI:
     return _client
 
 
+def _message_text(response: Any) -> str:
+    try:
+        content = response.choices[0].message.content
+    except (AttributeError, IndexError, TypeError):
+        return ""
+    return content if isinstance(content, str) else ""
+
+
 async def extract_concepts(input_text: str) -> dict[str, Any]:
     """
     Extract concepts and generate per-category query bundles from input text.
@@ -84,9 +92,13 @@ Return ONLY the JSON object."""
                 {"role": "user", "content": prompt},
             ],
         )
-        raw = response.choices[0].message.content.strip()
+        raw = _message_text(response).strip()
+        if not raw:
+            raise ValueError("Extractor returned empty message.content")
         raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.DOTALL).strip()
         result = json.loads(raw)
+        if not isinstance(result, dict):
+            raise ValueError("Extractor response JSON must be an object")
     except Exception as exc:
         logger.warning("extract_concepts failed: %s", exc)
         result = {}

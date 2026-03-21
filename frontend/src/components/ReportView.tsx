@@ -9,8 +9,18 @@ const VERDICT_CONFIG = {
 
 const SENTIMENT_ICONS: Record<string, string> = { positive: '👍', neutral: '😐', negative: '👎' }
 
-export function ReportView({ report, simId }: { report: ReportJSON; simId: string }) {
+export function ReportView({ report, simId }: { report: ReportJSON | null | undefined; simId: string }) {
   const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+
+  if (!report || !report.verdict) {
+    return (
+      <div style={{ padding: 48, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+        <div style={{ fontSize: 28, marginBottom: 12 }}>📊</div>
+        No simulation report available.
+      </div>
+    )
+  }
+
   const v = VERDICT_CONFIG[report.verdict] || VERDICT_CONFIG.mixed
 
   return (
@@ -31,7 +41,7 @@ export function ReportView({ report, simId }: { report: ReportJSON; simId: strin
 
       <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Segment Reactions</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
-        {report.segments.map(seg => (
+        {(report.segments || []).map(seg => (
           <div key={seg.name} style={{
             padding: 14, borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff',
           }}>
@@ -42,7 +52,7 @@ export function ReportView({ report, simId }: { report: ReportJSON; simId: strin
               </span>
             </div>
             <p style={{ margin: '0 0 8px', fontSize: 14, color: '#475569' }}>{seg.summary}</p>
-            {seg.key_quotes.map((q, i) => (
+            {(seg.key_quotes || []).map((q, i) => (
               <p key={i} style={{
                 margin: '4px 0', paddingLeft: 12, borderLeft: '3px solid #e2e8f0',
                 fontSize: 13, color: '#64748b', fontStyle: 'italic',
@@ -54,7 +64,7 @@ export function ReportView({ report, simId }: { report: ReportJSON; simId: strin
 
       <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Criticism Patterns</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
-        {report.criticism_clusters.map((c, i) => (
+        {(report.criticism_clusters || []).map((c, i) => (
           <div key={i} style={{
             padding: 12, borderRadius: 8, border: '1px solid #fecdd3',
             background: '#fff1f2',
@@ -74,7 +84,7 @@ export function ReportView({ report, simId }: { report: ReportJSON; simId: strin
 
       <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Improvement Suggestions</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 32 }}>
-        {report.improvements.map((imp, i) => (
+        {(report.improvements || []).map((imp, i) => (
           <div key={i} style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             padding: '10px 14px', borderRadius: 8, border: '1px solid #d1fae5',

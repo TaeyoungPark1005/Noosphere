@@ -17,10 +17,19 @@ const BIAS_COLORS: Record<string, string> = {
 
 type PersonaWithPlatform = Persona & { platform: Platform }
 
-export function PersonaCardView({ personas }: { personas: Partial<Record<Platform, Persona[]>> }) {
-  const allPersonas: PersonaWithPlatform[] = Object.entries(personas).flatMap(([platform, list]) =>
+export function PersonaCardView({ personas }: { personas: Partial<Record<Platform, Persona[]>> | null | undefined }) {
+  const allPersonas: PersonaWithPlatform[] = Object.entries(personas ?? {}).flatMap(([platform, list]) =>
     (list ?? []).map(p => ({ ...p, platform: platform as Platform }))
   )
+
+  if (allPersonas.length === 0) {
+    return (
+      <div style={{ padding: 48, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+        <div style={{ fontSize: 28, marginBottom: 12 }}>👤</div>
+        No personas generated yet.
+      </div>
+    )
+  }
 
   return (
     <div style={{

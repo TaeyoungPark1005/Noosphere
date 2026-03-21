@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import uuid
+from typing import Any
 
 import openai
 import httpx
@@ -16,8 +17,19 @@ _client: openai.AsyncOpenAI | None = None
 def _get_client() -> openai.AsyncOpenAI:
     global _client
     if _client is None:
-        _client = openai.AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""), timeout=30.0)
+        api_key = os.environ.get("OPENAI_API_KEY", "")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY not set")
+        _client = openai.AsyncOpenAI(api_key=api_key, timeout=30.0)
     return _client
+
+
+def _message_text(response: Any) -> str:
+    try:
+        content = response.choices[0].message.content
+    except (AttributeError, IndexError, TypeError):
+        return ""
+    return content if isinstance(content, str) else ""
 
 
 async def extract_concepts_from_text(text: str) -> list[str]:
@@ -32,7 +44,9 @@ async def extract_concepts_from_text(text: str) -> list[str]:
         max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
     )
-    raw = response.choices[0].message.content.strip()
+    raw = _message_text(response).strip()
+    if not raw:
+        return []
     raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.DOTALL).strip()
     try:
         concepts = json.loads(raw)
@@ -129,6 +143,6 @@ async def detect_domain(input_text: str) -> str:
             max_tokens=32,
             messages=[{"role": "user", "content": prompt}],
         )
-        return response.choices[0].message.content.strip()[:50]
+        return _message_text(response).strip()[:50] or "technology"
     except Exception:
         return "technology"

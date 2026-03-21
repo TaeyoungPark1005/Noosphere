@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
 import os
+from typing import Any
 
 import openai
 
@@ -26,6 +27,14 @@ def _get_client() -> openai.AsyncOpenAI:
     return _client
 
 
+def _message_text(response: Any) -> str:
+    try:
+        content = response.choices[0].message.content
+    except (AttributeError, IndexError, TypeError):
+        return ""
+    return content if isinstance(content, str) else ""
+
+
 def _fmt_items(items: list[dict], limit: int = 10) -> str:
     lines = []
     for it in items[:limit]:
@@ -46,7 +55,7 @@ async def generate_analysis_report(
 ) -> str:
     """
     RawItem 리스트로 경쟁 환경 분석 보고서를 생성합니다.
-    UMAP/KDE 없이 수집된 아이템만으로 Claude가 분석합니다.
+    UMAP/KDE 없이 수집된 아이템만으로 OpenAI 모델이 분석합니다.
     """
     if not raw_items:
         return "## Analysis Report\n\n수집된 데이터가 없습니다."
@@ -95,7 +104,7 @@ Respond entirely in {language}."""
                     {"role": "user", "content": prompt},
                 ],
             )
-            content = response.choices[0].message.content
+            content = _message_text(response)
             if content:
                 return content
         except Exception as exc:

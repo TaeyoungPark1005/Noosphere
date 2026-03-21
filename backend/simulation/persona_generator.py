@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from typing import Any
 import openai
 from backend.simulation.models import Persona
 from backend.simulation.graph_utils import sanitize_neighbor_titles
@@ -23,6 +24,25 @@ def _get_client() -> openai.AsyncOpenAI:
             )
         _client = openai.AsyncOpenAI(api_key=api_key, timeout=30.0)
     return _client
+
+
+def _parse_tool_arguments(message: Any, *, expected_name: str) -> dict:
+    tool_calls = getattr(message, "tool_calls", None) or []
+    if not tool_calls:
+        raise ValueError("No tool_calls in persona response")
+
+    function = getattr(tool_calls[0], "function", None)
+    if function is None:
+        raise ValueError("Tool call is missing function metadata")
+    if function.name != expected_name:
+        raise ValueError(f"Unexpected tool call {function.name!r}, expected {expected_name!r}")
+    if not function.arguments:
+        raise ValueError("Tool call arguments are empty")
+
+    data = json.loads(function.arguments)
+    if not isinstance(data, dict):
+        raise ValueError("Tool call arguments must decode to an object")
+    return data
 
 
 # For academic sources, force low commercial_focus; others are LLM-decided
@@ -202,12 +222,10 @@ async def generate_persona(
             logger.warning("Persona rate limit (attempt %d/4), retrying in %ds: %s", attempt + 1, wait, exc)
             await _asyncio.sleep(wait)
 
-    # Extract structured output from tool_calls
-    tool_calls = response.choices[0].message.tool_calls
-    if not tool_calls:
-        raise ValueError(f"No tool_use block in persona response for node {node_id}")
-
-    data: dict = json.loads(tool_calls[0].function.arguments)
+    data = _parse_tool_arguments(
+        response.choices[0].message,
+        expected_name="create_persona",
+    )
 
     # Apply forced attributes for academic sources
     forced = _FORCED_ATTRS_BY_SOURCE.get(source, {})

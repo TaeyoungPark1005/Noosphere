@@ -1,6 +1,15 @@
 import ReactMarkdown from 'react-markdown'
 
-export function MarkdownView({ content }: { content: string }) {
+export function MarkdownView({ content }: { content: string | null | undefined }) {
+  if (!content?.trim()) {
+    return (
+      <div style={{ padding: 48, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+        <div style={{ fontSize: 28, marginBottom: 12 }}>📄</div>
+        No analysis available.
+      </div>
+    )
+  }
+
   return (
     <div style={{ color: '#1e293b', lineHeight: 1.75, fontSize: 15 }}>
       <ReactMarkdown
