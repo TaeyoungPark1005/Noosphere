@@ -4,7 +4,7 @@ import dataclasses
 import logging
 from collections.abc import AsyncGenerator
 
-from backend.simulation.models import Persona, PlatformState
+from backend.simulation.models import Persona, PlatformState, SocialPost
 from backend.simulation.graph_utils import build_adjacency, degree_centrality
 from backend.simulation.social_rounds import (
     round_personas, generate_seed_post, platform_round, generate_report
@@ -36,6 +36,61 @@ def _deduplicate_names(results: list[tuple[dict, "Persona | None"]]) -> None:
         name_counter[base_name] = count + 1
 
 
+def _restore_personas(personas_dict: dict) -> dict[str, list[Persona]]:
+    """Reconstruct Persona dataclass instances from checkpoint dict."""
+    result = {}
+    for platform_name, persona_list in personas_dict.items():
+        restored = []
+        for d in persona_list:
+            # 'generation' is a @property — must not be passed to constructor
+            restored.append(Persona(
+                node_id=d["node_id"],
+                name=d["name"],
+                role=d["role"],
+                age=d["age"],
+                seniority=d["seniority"],
+                affiliation=d["affiliation"],
+                company=d["company"],
+                mbti=d["mbti"],
+                interests=d["interests"],
+                skepticism=d["skepticism"],
+                commercial_focus=d["commercial_focus"],
+                innovation_openness=d["innovation_openness"],
+                source_title=d["source_title"],
+            ))
+        result[platform_name] = restored
+    return result
+
+
+def _restore_platform_states(states_dict: dict) -> dict[str, PlatformState]:
+    """Reconstruct PlatformState dataclass instances from checkpoint dict."""
+    result = {}
+    for platform_name, state_d in states_dict.items():
+        posts = [
+            SocialPost(
+                id=p["id"],
+                platform=p["platform"],
+                author_node_id=p["author_node_id"],
+                author_name=p["author_name"],
+                content=p["content"],
+                action_type=p["action_type"],
+                round_num=p["round_num"],
+                upvotes=p.get("upvotes", 0),
+                downvotes=p.get("downvotes", 0),
+                parent_id=p.get("parent_id"),
+                structured_data=p.get("structured_data", {}),
+            )
+            for p in state_d.get("posts", [])
+        ]
+        result[platform_name] = PlatformState(
+            platform_name=state_d["platform_name"],
+            posts=posts,
+            round_num=state_d.get("round_num", 0),
+            recent_speakers=state_d.get("recent_speakers", {}),
+        )
+    return result
+
+
 async def run_simulation(
     input_text: str,
     context_nodes: list[dict],
@@ -48,6 +103,7 @@ async def run_simulation(
     activation_rate: float = 0.25,
     provider: str = "openai",
     ontology: dict | None = None,
+    checkpoint: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
     nodes = context_nodes  # alias for rest of function body
     idea_text = input_text  # alias for rest of function body
@@ -70,68 +126,77 @@ async def run_simulation(
 
     yield {"type": "sim_start", "agent_count": len(nodes)}
 
-    # Persona generation: one pool per platform, run in parallel
-    platform_personas: dict[str, list[Persona]] = {p.name: [] for p in active_platforms}
+    if checkpoint is not None:
+        # --- RESUME PATH ---
+        platform_personas = _restore_personas(checkpoint["personas"])
+        platform_states = _restore_platform_states(checkpoint["platform_states"])
+        start_round = checkpoint["last_round"] + 1
+        yield {"type": "sim_resume", "from_round": start_round}
+    else:
+        # --- NORMAL PATH ---
+        # Persona generation: one pool per platform, run in parallel
+        platform_personas: dict[str, list[Persona]] = {p.name: [] for p in active_platforms}
 
-    async def collect_personas_for_platform(platform_name: str) -> list[tuple[dict, Persona]]:
-        results = []
-        async for event in round_personas(
-            nodes, idea_text,
-            adjacency=adjacency, id_to_node=id_to_node,
-            platform_name=platform_name,
-            provider=provider,
-            ontology=ontology,
-        ):
-            persona = event.pop("_persona", None)
-            if persona is not None:
-                results.append((event, persona))
-            else:
-                results.append((event, None))
-        _deduplicate_names(results)
-        return results
-
-    persona_tasks = {
-        p.name: asyncio.create_task(collect_personas_for_platform(p.name))
-        for p in active_platforms
-    }
-    for platform_name, task in persona_tasks.items():
-        try:
-            entries = await task
-            for event, persona in entries:
+        async def collect_personas_for_platform(platform_name: str) -> list[tuple[dict, Persona]]:
+            results = []
+            async for event in round_personas(
+                nodes, idea_text,
+                adjacency=adjacency, id_to_node=id_to_node,
+                platform_name=platform_name,
+                provider=provider,
+            ):
+                persona = event.pop("_persona", None)
                 if persona is not None:
-                    platform_personas[platform_name].append(persona)
-                yield event
-        except Exception as exc:
-            logger.warning("Persona generation failed for platform %s: %s", platform_name, exc)
+                    results.append((event, persona))
+                else:
+                    results.append((event, None))
+            _deduplicate_names(results)
+            return results
 
-    if not any(platform_personas.values()):
-        yield {"type": "sim_error", "message": "Persona generation failed for all platforms"}
-        yield {"type": "sim_done"}
-        return
+        persona_tasks = {
+            p.name: asyncio.create_task(collect_personas_for_platform(p.name))
+            for p in active_platforms
+        }
+        for platform_name, task in persona_tasks.items():
+            try:
+                entries = await task
+                for event, persona in entries:
+                    if persona is not None:
+                        platform_personas[platform_name].append(persona)
+                    yield event
+            except Exception as exc:
+                logger.warning("Persona generation failed for platform %s: %s", platform_name, exc)
 
-    # Round 0: seed posts for each platform (parallel)
-    platform_states: dict[str, PlatformState] = {}
-    seed_tasks = {
-        p.name: asyncio.create_task(generate_seed_post(p, idea_text, language, provider=provider))
-        for p in active_platforms
-    }
-    for name, task in seed_tasks.items():
-        try:
-            seed_post = await task
-            state = PlatformState(platform_name=name, posts=[seed_post], round_num=0)
-            platform_states[name] = state
-            yield {"type": "sim_platform_post", "platform": name,
-                   "post": dataclasses.asdict(seed_post)}
-        except Exception as exc:
-            logger.warning("Seed post failed for %s: %s", name, exc)
+        if not any(platform_personas.values()):
+            yield {"type": "sim_error", "message": "Persona generation failed for all platforms"}
+            yield {"type": "sim_done"}
+            return
 
-    if not platform_states:
-        yield {"type": "sim_error", "message": "All platforms failed to initialize"}
-        yield {"type": "sim_done"}
-        return
+        # Round 0: seed posts for each platform (parallel)
+        platform_states: dict[str, PlatformState] = {}
+        seed_tasks = {
+            p.name: asyncio.create_task(generate_seed_post(p, idea_text, language, provider=provider, ontology=ontology))
+            for p in active_platforms
+        }
+        for name, task in seed_tasks.items():
+            try:
+                seed_post = await task
+                state = PlatformState(platform_name=name, posts=[seed_post], round_num=0)
+                platform_states[name] = state
+                yield {"type": "sim_platform_post", "platform": name,
+                       "post": dataclasses.asdict(seed_post)}
+            except Exception as exc:
+                logger.warning("Seed post failed for %s: %s", name, exc)
 
-    # Rounds 1~num_rounds
-    for round_num in range(1, num_rounds + 1):
+        if not platform_states:
+            yield {"type": "sim_error", "message": "All platforms failed to initialize"}
+            yield {"type": "sim_done"}
+            return
+
+        start_round = 1
+
+    # Rounds start_round~num_rounds
+    for round_num in range(start_round, num_rounds + 1):
         async def run_platform_round(plat, rn=round_num):
             events_out = []
             state = platform_states.get(plat.name)
@@ -144,7 +209,8 @@ async def run_simulation(
             async for event in platform_round(
                 plat, state, plat_personas, degree, idea_text, rn, language, activation_rate,
                 provider=provider,
-                ontology=ontology,
+                adjacency=adjacency,
+                id_to_node=id_to_node,
             ):
                 events_out.append(event)
             return events_out
@@ -175,6 +241,24 @@ async def run_simulation(
             yield {"type": "sim_done"}
             return
 
+        # Emit checkpoint data — intercepted by tasks.py, NOT forwarded to Redis
+        yield {
+            "type": "sim_checkpoint_data",
+            "round_num": round_num,
+            "platform_states": {
+                name: dataclasses.asdict(state)
+                for name, state in platform_states.items()
+            },
+            "personas": {
+                name: [dataclasses.asdict(p) for p in personas_list]
+                for name, personas_list in platform_personas.items()
+            },
+            "context_nodes": context_nodes,
+            "domain": domain,
+            "analysis_md": "",  # tasks.py fills in the real value when saving
+            "ontology": ontology,
+            "raw_items": [],    # tasks.py fills in the real value when saving
+        }
         yield {
             "type": "sim_round_summary",
             "round_num": round_num,
