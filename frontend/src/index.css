@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,300;1,9..144,400;1,9..144,600&family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -151,5 +153,16 @@ button:active:not(:disabled) {
   content: '|';
   animation: blink 1s step-end infinite;
   margin-left: 1px;
-  color: #8b5cf6;
+  color: #8070ff;
+}
+
+/* ── 데모 Run 버튼 클릭 애니메이션 ──────────────────── */
+@keyframes runClick {
+  0%   { transform: scale(1);    background: #1e293b; }
+  40%  { transform: scale(0.96); background: #8070ff; }
+  100% { transform: scale(1);    background: #1e293b; }
+}
+
+.run-btn-click {
+  animation: runClick 200ms ease forwards;
 }
