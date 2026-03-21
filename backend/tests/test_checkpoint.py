@@ -1,17 +1,14 @@
 import json
 import pytest
-import tempfile
 from pathlib import Path
 from backend.db import init_db, save_checkpoint, get_checkpoint, delete_checkpoint
 
 
 @pytest.fixture
-def db_path():
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-        path = Path(f.name)
+def db_path(tmp_path):
+    path = tmp_path / "test.db"
     init_db(path)
-    yield path
-    path.unlink(missing_ok=True)
+    return path
 
 
 def test_get_checkpoint_returns_none_when_missing(db_path):

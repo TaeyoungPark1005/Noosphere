@@ -92,6 +92,25 @@ def init_db(path: str | Path = DB_PATH) -> None:
             except Exception:
                 pass  # 이미 있으면 무시
 
+        try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS sim_checkpoints (
+                    sim_id TEXT PRIMARY KEY,
+                    last_round INTEGER NOT NULL,
+                    platform_states_json TEXT NOT NULL,
+                    personas_json TEXT NOT NULL,
+                    context_nodes_json TEXT NOT NULL,
+                    domain TEXT NOT NULL,
+                    analysis_md TEXT NOT NULL,
+                    ontology_json TEXT,
+                    raw_items_json TEXT NOT NULL,
+                    saved_at TEXT NOT NULL
+                )
+            """)
+            conn.commit()
+        except Exception:
+            pass
+
 
 def create_simulation(
     path: str | Path,
