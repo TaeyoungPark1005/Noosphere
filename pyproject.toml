@@ -17,6 +17,7 @@ dependencies = [
     "google-play-scraper>=1.2",
     "celery>=5.3",
     "redis>=5.0",
+    "google-api-core>=2.30.0",
 ]
 
 [project.optional-dependencies]

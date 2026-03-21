@@ -1,15 +1,12 @@
 from __future__ import annotations
 import json
 import logging
-import os
 import re
 from typing import Any
 
-import openai
+from backend import llm
 
 logger = logging.getLogger(__name__)
-
-_client: openai.AsyncOpenAI | None = None
 
 DOMAIN_QUERY_COUNTS = {
     "tech":       {"code": 5, "academic": 5, "discussion": 3, "product": 2, "news": 1},
@@ -33,25 +30,7 @@ Category query styles:
 Respond with ONLY valid JSON. No markdown, no explanation."""
 
 
-def _get_client() -> openai.AsyncOpenAI:
-    global _client
-    if _client is None:
-        api_key = os.environ.get("OPENAI_API_KEY", "")
-        if not api_key:
-            raise RuntimeError("OPENAI_API_KEY not set")
-        _client = openai.AsyncOpenAI(api_key=api_key, timeout=60.0)
-    return _client
-
-
-def _message_text(response: Any) -> str:
-    try:
-        content = response.choices[0].message.content
-    except (AttributeError, IndexError, TypeError):
-        return ""
-    return content if isinstance(content, str) else ""
-
-
-async def extract_concepts(input_text: str) -> dict[str, Any]:
+async def extract_concepts(input_text: str, provider: str = "openai") -> dict[str, Any]:
     """
     Extract concepts and generate per-category query bundles from input text.
     Returns dict with: concepts, domain, domain_type, search_queries, query_bundles.
@@ -82,17 +61,17 @@ Categories with 0 target count should be OMITTED from query_bundles entirely.
 search_queries: always include 2-4 general queries as fallback.
 Return ONLY the JSON object."""
 
-    client = _get_client()
     try:
-        response = await client.chat.completions.create(
-            model="gpt-5.4-mini",
-            max_tokens=2048,
+        response = await llm.complete(
             messages=[
                 {"role": "system", "content": _SYSTEM},
                 {"role": "user", "content": prompt},
             ],
+            tier="mid",
+            provider=provider,
+            max_tokens=2048,
         )
-        raw = _message_text(response).strip()
+        raw = (response.content or "").strip()
         if not raw:
             raise ValueError("Extractor returned empty message.content")
         raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.DOTALL).strip()
