@@ -26,6 +26,7 @@ async def run_simulation(
     language: str = "English",
     edges: list[dict] | None = None,
     activation_rate: float = 0.25,
+    provider: str = "openai",
 ) -> AsyncGenerator[dict, None]:
     nodes = context_nodes  # alias for rest of function body
     idea_text = input_text  # alias for rest of function body
@@ -57,6 +58,7 @@ async def run_simulation(
             nodes, idea_text,
             adjacency=adjacency, id_to_node=id_to_node,
             platform_name=platform_name,
+            provider=provider,
         ):
             persona = event.pop("_persona", None)
             if persona is not None:
@@ -87,7 +89,7 @@ async def run_simulation(
     # Round 0: seed posts for each platform (parallel)
     platform_states: dict[str, PlatformState] = {}
     seed_tasks = {
-        p.name: asyncio.create_task(generate_seed_post(p, idea_text, language))
+        p.name: asyncio.create_task(generate_seed_post(p, idea_text, language, provider=provider))
         for p in active_platforms
     }
     for name, task in seed_tasks.items():
@@ -117,7 +119,8 @@ async def run_simulation(
                 logger.warning("No personas for platform %s, skipping round %d", plat.name, rn)
                 return events_out
             async for event in platform_round(
-                plat, state, plat_personas, degree, idea_text, rn, language, activation_rate
+                plat, state, plat_personas, degree, idea_text, rn, language, activation_rate,
+                provider=provider,
             ):
                 events_out.append(event)
             return events_out
@@ -157,7 +160,7 @@ async def run_simulation(
     # Final report
     try:
         report_json, report_md = await generate_report(
-            list(platform_states.values()), idea_text, domain, language
+            list(platform_states.values()), idea_text, domain, language, provider=provider
         )
     except Exception as exc:
         logger.error("Report generation failed: %s", exc)
