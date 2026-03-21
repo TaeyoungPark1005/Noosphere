@@ -58,4 +58,4 @@ async def test_generate_final_report_korean():
             language="Korean",
             provider="openai",
         )
-    assert "최종" in result or len(result) > 0
+    assert "최종" in result
