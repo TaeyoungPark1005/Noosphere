@@ -6,6 +6,9 @@ import os
 from dataclasses import dataclass
 from typing import Literal
 
+import openai
+from backend.simulation.rate_limiter import acquire_api_slot
+
 logger = logging.getLogger(__name__)
 
 LLMTier = Literal["high", "mid", "low"]
@@ -69,8 +72,66 @@ async def complete(
     raise ValueError(f"Unknown provider: {provider!r}")
 
 
-async def _complete_openai(messages, model, max_tokens, timeout, tools, tool_choice):
-    raise NotImplementedError("OpenAI provider not yet implemented")
+_openai_client: openai.AsyncOpenAI | None = None
+
+
+def _get_openai_client() -> openai.AsyncOpenAI:
+    global _openai_client
+    if _openai_client is None:
+        api_key = os.environ.get("OPENAI_API_KEY", "")
+        _openai_client = openai.AsyncOpenAI(api_key=api_key, timeout=60.0)
+    return _openai_client
+
+
+def _tool_choice_openai(tool_choice: str | None) -> str | dict:
+    if tool_choice is None:
+        return "auto"
+    return {"type": "function", "function": {"name": tool_choice}}
+
+
+def _extract_openai_response(response, tool_choice: str | None) -> LLMResponse:
+    message = response.choices[0].message
+    tool_calls = getattr(message, "tool_calls", None) or []
+    if tool_calls:
+        tc = tool_calls[0]
+        return LLMResponse(
+            content=message.content,
+            tool_name=tc.function.name,
+            tool_args=json.loads(tc.function.arguments),
+        )
+    if tool_choice is not None:
+        raise LLMToolRequired(f"Expected tool call '{tool_choice}' but got none")
+    return LLMResponse(content=message.content, tool_name=None, tool_args=None)
+
+
+async def _complete_openai(
+    messages: list[dict],
+    model: str,
+    max_tokens: int,
+    timeout: float,
+    tools: list[dict] | None,
+    tool_choice: str | None,
+) -> LLMResponse:
+    client = _get_openai_client()
+    kwargs: dict = {"model": model, "max_tokens": max_tokens, "messages": messages}
+    if tools:
+        kwargs["tools"] = tools
+        kwargs["tool_choice"] = _tool_choice_openai(tool_choice)
+
+    for attempt in range(4):
+        await acquire_api_slot()
+        try:
+            response = await client.chat.completions.create(**kwargs)
+            return _extract_openai_response(response, tool_choice)
+        except LLMToolRequired:
+            raise
+        except openai.RateLimitError:
+            if attempt == 3:
+                raise LLMRateLimitError("OpenAI rate limit exceeded")
+            wait = 5 * (2 ** attempt)
+            logger.warning("OpenAI rate limit, retrying in %ds", wait)
+            await asyncio.sleep(wait)
+    raise RuntimeError("Unreachable")
 
 
 async def _complete_anthropic(messages, model, max_tokens, timeout, tools, tool_choice):
