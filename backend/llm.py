@@ -243,16 +243,18 @@ def _get_gemini_client():
 
 
 def _deep_strip_schema_keys(schema: dict) -> dict:
-    """Recursively remove additionalProperties and $schema from a JSON schema."""
+    """Recursively remove additionalProperties and $schema from a JSON schema at all nesting levels."""
     _STRIP = {"additionalProperties", "$schema"}
-    result = {k: v for k, v in schema.items() if k not in _STRIP}
-    if "properties" in result and isinstance(result["properties"], dict):
-        result["properties"] = {
-            k: _deep_strip_schema_keys(v) if isinstance(v, dict) else v
-            for k, v in result["properties"].items()
-        }
-    if "items" in result and isinstance(result["items"], dict):
-        result["items"] = _deep_strip_schema_keys(result["items"])
+    result = {}
+    for k, v in schema.items():
+        if k in _STRIP:
+            continue
+        if isinstance(v, dict):
+            result[k] = _deep_strip_schema_keys(v)
+        elif isinstance(v, list):
+            result[k] = [_deep_strip_schema_keys(i) if isinstance(i, dict) else i for i in v]
+        else:
+            result[k] = v
     return result
 
 
@@ -272,15 +274,19 @@ def _to_gemini_tools(tools: list[dict]) -> list:
 
 
 def _rewrite_system_for_gemini(messages: list[dict]) -> list[dict]:
-    """Convert role='system' messages to user+model pairs for Gemini."""
+    """Convert role='system' messages to user+model pairs for Gemini.
+
+    Also maps 'assistant' → 'model' and 'tool' → 'user' since Gemini only
+    accepts 'user' and 'model' roles.
+    """
+    _ROLE_MAP = {"assistant": "model", "tool": "user"}
     result = []
     for m in messages:
         if m.get("role") == "system":
             result.append({"role": "user", "content": m["content"]})
             result.append({"role": "model", "content": "Understood."})
         else:
-            # Gemini uses 'model' not 'assistant'
-            role = "model" if m.get("role") == "assistant" else m.get("role", "user")
+            role = _ROLE_MAP.get(m.get("role", "user"), m.get("role", "user"))
             result.append({"role": role, "content": m["content"]})
     return result
 
@@ -302,7 +308,7 @@ def _extract_gemini_response(response, tool_choice: str | None) -> LLMResponse:
         parts = response.candidates[0].content.parts
         for part in parts:
             fc = getattr(part, "function_call", None)
-            if fc is not None:
+            if fc is not None and fc.name:
                 return LLMResponse(
                     content=None,
                     tool_name=fc.name,
@@ -344,10 +350,13 @@ async def _complete_gemini(
 
     for attempt in range(4):
         try:
-            response = await client.aio.models.generate_content(
-                model=model,
-                contents=contents,
-                config=config,
+            response = await asyncio.wait_for(
+                client.aio.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=config,
+                ),
+                timeout=timeout,
             )
             return _extract_gemini_response(response, tool_choice)
         except LLMToolRequired:

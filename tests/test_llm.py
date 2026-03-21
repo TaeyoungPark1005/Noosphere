@@ -227,7 +227,7 @@ async def test_complete_gemini_text():
 
 
 def test_deep_strip_schema_keys():
-    """_deep_strip_schema_keys removes additionalProperties and $schema at all levels."""
+    """_deep_strip_schema_keys removes additionalProperties and $schema at all nesting levels."""
     from backend.llm import _deep_strip_schema_keys
     schema = {
         "type": "object",
@@ -240,7 +240,11 @@ def test_deep_strip_schema_keys():
                 "$schema": "ignored",
                 "properties": {}
             }
-        }
+        },
+        "anyOf": [
+            {"type": "string", "additionalProperties": False, "$schema": "x"},
+            {"type": "number"},
+        ],
     }
     result = _deep_strip_schema_keys(schema)
     assert "$schema" not in result
@@ -248,3 +252,6 @@ def test_deep_strip_schema_keys():
     assert "$schema" not in result["properties"]["nested"]
     assert "additionalProperties" not in result["properties"]["nested"]
     assert result["type"] == "object"
+    # anyOf list items are also stripped
+    assert "additionalProperties" not in result["anyOf"][0]
+    assert "$schema" not in result["anyOf"][0]
