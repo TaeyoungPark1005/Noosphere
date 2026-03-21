@@ -8,6 +8,8 @@ from typing import Literal
 
 import anthropic as _anthropic
 import openai
+from google import genai as _genai
+from google.api_core import exceptions as _google_exceptions
 from backend.simulation.rate_limiter import acquire_api_slot
 
 logger = logging.getLogger(__name__)
@@ -229,5 +231,131 @@ async def _complete_anthropic(
     raise RuntimeError("Unreachable")
 
 
-async def _complete_gemini(messages, model, max_tokens, timeout, tools, tool_choice):
-    raise NotImplementedError("Gemini provider not yet implemented")
+_gemini_client = None
+
+
+def _get_gemini_client():
+    global _gemini_client
+    if _gemini_client is None:
+        api_key = os.environ.get("GEMINI_API_KEY", "")
+        _gemini_client = _genai.Client(api_key=api_key)
+    return _gemini_client
+
+
+def _deep_strip_schema_keys(schema: dict) -> dict:
+    """Recursively remove additionalProperties and $schema from a JSON schema."""
+    _STRIP = {"additionalProperties", "$schema"}
+    result = {k: v for k, v in schema.items() if k not in _STRIP}
+    if "properties" in result and isinstance(result["properties"], dict):
+        result["properties"] = {
+            k: _deep_strip_schema_keys(v) if isinstance(v, dict) else v
+            for k, v in result["properties"].items()
+        }
+    if "items" in result and isinstance(result["items"], dict):
+        result["items"] = _deep_strip_schema_keys(result["items"])
+    return result
+
+
+def _to_gemini_tools(tools: list[dict]) -> list:
+    """Convert OpenAI-format tools to Gemini FunctionDeclarations."""
+    declarations = []
+    for t in tools:
+        fn = t["function"]
+        declarations.append(
+            _genai.types.FunctionDeclaration(
+                name=fn["name"],
+                description=fn.get("description", ""),
+                parameters=_deep_strip_schema_keys(fn["parameters"]),
+            )
+        )
+    return [_genai.types.Tool(function_declarations=declarations)]
+
+
+def _rewrite_system_for_gemini(messages: list[dict]) -> list[dict]:
+    """Convert role='system' messages to user+model pairs for Gemini."""
+    result = []
+    for m in messages:
+        if m.get("role") == "system":
+            result.append({"role": "user", "content": m["content"]})
+            result.append({"role": "model", "content": "Understood."})
+        else:
+            # Gemini uses 'model' not 'assistant'
+            role = "model" if m.get("role") == "assistant" else m.get("role", "user")
+            result.append({"role": role, "content": m["content"]})
+    return result
+
+
+def _to_gemini_contents(messages: list[dict]) -> list:
+    """Convert message dicts to Gemini Content objects."""
+    contents = []
+    for m in _rewrite_system_for_gemini(messages):
+        contents.append(_genai.types.Content(
+            role=m["role"],
+            parts=[_genai.types.Part.from_text(text=m["content"])],
+        ))
+    return contents
+
+
+def _extract_gemini_response(response, tool_choice: str | None) -> LLMResponse:
+    # Look for function_call in parts
+    try:
+        parts = response.candidates[0].content.parts
+        for part in parts:
+            fc = getattr(part, "function_call", None)
+            if fc is not None:
+                return LLMResponse(
+                    content=None,
+                    tool_name=fc.name,
+                    tool_args=dict(fc.args),
+                )
+    except (IndexError, AttributeError):
+        pass
+    if tool_choice is not None:
+        raise LLMToolRequired(f"Expected tool call '{tool_choice}' but got none")
+    return LLMResponse(content=response.text, tool_name=None, tool_args=None)
+
+
+async def _complete_gemini(
+    messages: list[dict],
+    model: str,
+    max_tokens: int,
+    timeout: float,
+    tools: list[dict] | None,
+    tool_choice: str | None,
+) -> LLMResponse:
+    client = _get_gemini_client()
+    contents = _to_gemini_contents(messages)
+
+    gemini_tools = _to_gemini_tools(tools) if tools else None
+    tool_config = None
+    if tools:
+        mode = "ANY" if tool_choice else "AUTO"
+        tool_config = _genai.types.ToolConfig(
+            functionCallingConfig=_genai.types.FunctionCallingConfig(
+                mode=mode,
+                allowedFunctionNames=[tool_choice] if tool_choice else None,
+            )
+        )
+    config = _genai.types.GenerateContentConfig(
+        maxOutputTokens=max_tokens,
+        tools=gemini_tools,
+        toolConfig=tool_config,
+    )
+
+    for attempt in range(4):
+        try:
+            response = await client.aio.models.generate_content(
+                model=model,
+                contents=contents,
+                config=config,
+            )
+            return _extract_gemini_response(response, tool_choice)
+        except LLMToolRequired:
+            raise
+        except _google_exceptions.ResourceExhausted:
+            if attempt == 3:
+                raise LLMRateLimitError("Gemini rate limit exceeded")
+            wait = 5 * (2 ** attempt)
+            logger.warning("Gemini rate limit, retrying in %ds", wait)
+            await asyncio.sleep(wait)
+    raise RuntimeError("Unreachable")

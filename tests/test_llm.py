@@ -197,3 +197,54 @@ async def test_complete_openai_tool_required_raises():
                 tools=[tool],
                 tool_choice="create_persona",
             )
+
+
+async def test_complete_gemini_text():
+    """complete() returns content for Gemini text response."""
+    from backend.llm import complete
+
+    mock_response = MagicMock()
+    mock_response.text = "Gemini says hi"
+    # Part with no function_call attribute
+    mock_part = MagicMock(spec=[])  # no function_call attribute
+    mock_response.candidates = [MagicMock(content=MagicMock(parts=[mock_part]))]
+
+    mock_aio = AsyncMock()
+    mock_aio.models.generate_content = AsyncMock(return_value=mock_response)
+    mock_client = MagicMock()
+    mock_client.aio = mock_aio
+
+    with patch("backend.llm._get_gemini_client", return_value=mock_client), \
+         patch.dict(os.environ, {"GEMINI_API_KEY": "gemini-test"}):
+        result = await complete(
+            messages=[{"role": "user", "content": "hi"}],
+            tier="low",
+            provider="gemini",
+            max_tokens=50,
+        )
+    assert result.content == "Gemini says hi"
+    assert result.tool_args is None
+
+
+def test_deep_strip_schema_keys():
+    """_deep_strip_schema_keys removes additionalProperties and $schema at all levels."""
+    from backend.llm import _deep_strip_schema_keys
+    schema = {
+        "type": "object",
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": False,
+        "properties": {
+            "nested": {
+                "type": "object",
+                "additionalProperties": True,
+                "$schema": "ignored",
+                "properties": {}
+            }
+        }
+    }
+    result = _deep_strip_schema_keys(schema)
+    assert "$schema" not in result
+    assert "additionalProperties" not in result
+    assert "$schema" not in result["properties"]["nested"]
+    assert "additionalProperties" not in result["properties"]["nested"]
+    assert result["type"] == "object"
