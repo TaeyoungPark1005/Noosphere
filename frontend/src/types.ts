@@ -66,6 +66,17 @@ export interface ReportJSON {
   improvements: Improvement[]
 }
 
+export interface SourceItem {
+  id: string
+  title: string
+  source: string
+  score: number
+  url?: string
+  text?: string
+  date?: string
+  metadata?: Record<string, unknown>
+}
+
 export interface SimResults {
   sim_id: string
   posts_json: Partial<Record<Platform, SocialPost[]>>
@@ -73,6 +84,7 @@ export interface SimResults {
   report_json: ReportJSON
   report_md: string
   analysis_md: string
+  sources_json: SourceItem[]
 }
 
 export interface HistoryItem {

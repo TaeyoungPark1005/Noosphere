@@ -203,6 +203,7 @@ Across all five simulated platforms, the overall reception was **cautiously opti
   },
 
   report_md: '',
+  sources_json: [],
 }
 
 // ─── 소스 색상 ───────────────────────────────────────────────────────────────
