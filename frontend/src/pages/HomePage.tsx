@@ -206,6 +206,13 @@ export function HomePage() {
           }}
         />
 
+        {/* Char count */}
+        {inputText.length > 0 && (
+          <div style={{ textAlign: 'right', fontSize: 12, color: '#94a3b8', marginTop: 6 }}>
+            {inputText.length.toLocaleString()} characters
+          </div>
+        )}
+
         {/* Platforms */}
         <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap', animation: 'fadeInUp 0.5s ease both' }}>
           {PLATFORM_OPTIONS.map((p, i) => {
@@ -265,7 +272,7 @@ export function HomePage() {
               </div>
 
               {optionsTab === 'simulation' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="options-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   {/* Language */}
                   <div style={css.card}>
                     <div style={css.sectionTitle}>Language</div>
@@ -341,7 +348,7 @@ export function HomePage() {
                   <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px' }}>
                     Configure how many results to fetch from each source. Set to 0 to skip a source.
                   </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="options-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     {SOURCE_GROUPS.map(group => (
                       <div key={group.group} style={css.card}>
                         <div style={css.sectionTitle}>{group.group}</div>
