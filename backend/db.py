@@ -183,6 +183,14 @@ def update_simulation_status(
     return cur.rowcount > 0
 
 
+def update_simulation_domain(path: str | Path, sim_id: str, domain: str) -> None:
+    with _conn(path) as conn:
+        conn.execute(
+            "UPDATE simulations SET domain=? WHERE id=?",
+            (domain, sim_id),
+        )
+
+
 def request_simulation_cancel(path: str | Path, sim_id: str) -> bool:
     now = _utc_now_iso()
     with _conn(path) as conn:
@@ -419,3 +427,12 @@ def list_history(path: str | Path = DB_PATH, limit: int = 50) -> list[dict]:
         d["config"] = json.loads(d.pop("config_json"))
         result.append(d)
     return result
+
+
+def delete_simulation(path: str | Path, sim_id: str) -> bool:
+    """3개 테이블에서 시뮬레이션 데이터를 완전 삭제. 삭제된 행이 있으면 True 반환."""
+    with _conn(path) as conn:
+        cur = conn.execute("DELETE FROM simulations WHERE id=?", (sim_id,))
+        conn.execute("DELETE FROM sim_results WHERE sim_id=?", (sim_id,))
+        conn.execute("DELETE FROM sim_checkpoints WHERE sim_id=?", (sim_id,))
+    return cur.rowcount > 0

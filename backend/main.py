@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import json
 import logging
 import os
@@ -67,7 +68,7 @@ try:
         init_db, create_simulation, update_simulation_status,
         get_sim_results, list_history, get_simulation, DB_PATH,
         count_active_simulations, reconcile_stale_simulations, request_simulation_cancel,
-        get_checkpoint,
+        get_checkpoint, delete_simulation,
     )
     from backend.tasks import run_simulation_task, STREAM_KEY
 except ModuleNotFoundError:  # pragma: no cover - allow SimConfig import in minimal envs
@@ -373,6 +374,9 @@ async def export_pdf(sim_id: str):
     from backend.exporter import build_pdf
     import json as _json
     sim_params = _json.loads(sim["config_json"]) if sim else {}
+    context_nodes = results.get("context_nodes_json") or []
+    idea_node = next((n for n in context_nodes if isinstance(n, dict) and n.get("id") == "idea"), None)
+    idea_title = idea_node.get("title", "") if idea_node else ""
     pdf_bytes = await build_pdf(
         report_md=results["report_md"],
         input_text=sim["input_text"] if sim else "",
@@ -382,9 +386,35 @@ async def export_pdf(sim_id: str):
         analysis_md=results.get("analysis_md"),
         sim_params=sim_params,
         final_report_md=results.get("final_report_md"),
+        idea_title=idea_title,
     )
     return StreamingResponse(
         iter([pdf_bytes]),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="noosphere-report-{sim_id[:8]}.pdf"'},
     )
+
+
+@app.delete("/simulate/{sim_id}")
+async def delete_simulation_endpoint(sim_id: str):
+    """시뮬레이션 데이터를 DB와 Redis에서 완전 삭제."""
+    sim = get_simulation(DB_PATH, sim_id)
+    if not sim:
+        raise HTTPException(404, "Simulation not found")
+    if sim.get("status") == "running":
+        raise HTTPException(409, "Cannot delete a running simulation. Stop it first.")
+
+    deleted = await asyncio.to_thread(delete_simulation, DB_PATH, sim_id)
+    if not deleted:
+        raise HTTPException(404, "Simulation not found")
+
+    # Redis 스트림 키 삭제
+    try:
+        import redis as _redis_sync
+        r = _redis_sync.from_url(REDIS_URL)
+        r.delete(STREAM_KEY.format(sim_id))
+        r.close()
+    except Exception:
+        pass  # Redis 삭제 실패는 무시 (이미 만료됐을 수 있음)
+
+    return {"deleted": sim_id}
