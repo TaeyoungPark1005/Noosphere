@@ -27,7 +27,9 @@ export function PlatformSimFeed({ postsByPlatform, ideaText = '', forcedTab }: P
 
   const [activeTab, setActiveTab] = useState<Platform | null>(null)
 
-  const tab = forcedTab ?? activeTab ?? activePlatforms[0] ?? null
+  // If activeTab is no longer in the visible platforms (e.g. round filter changed),
+  // fall back to the first available platform so content isn't blank
+  const tab = forcedTab ?? (activeTab && activePlatforms.includes(activeTab) ? activeTab : null) ?? activePlatforms[0] ?? null
   const posts = tab ? (postsByPlatform[tab] ?? []) : []
 
   if (activePlatforms.length === 0) {

@@ -1,17 +1,18 @@
 import type { Platform, ReportJSON } from './types'
 
 export const SOURCE_COLORS: Record<string, string> = {
-  arxiv:        '#a855f7',
-  semantic_scholar: '#6366f1',
-  hackernews:   '#f97316',
-  reddit:       '#ef4444',
-  github:       '#22c55e',
-  product_hunt: '#ec4899',
-  itunes:       '#fc3158',
-  google_play:  '#01875f',
-  gdelt:        '#eab308',
-  serper:       '#0891b2',
-  input_text:   '#64748b',
+  arxiv:            '#7B2D8E', // 짙은 보라
+  semantic_scholar: '#1D4ED8', // 로열 블루
+  hackernews:       '#FF6B35', // 주황
+  reddit:           '#C5283D', // 크림슨
+  github:           '#15803D', // 포레스트 그린
+  product_hunt:     '#EC4899', // 핫핑크
+  itunes:           '#F59E0B', // 앰버
+  google_play:      '#14B8A6', // 틸
+  gdelt:            '#84CC16', // 라임
+  serper:           '#0891B2', // 시안
+  input_text:       '#64748B', // 슬레이트 그레이
+  idea:             '#A855F7', // 바이올렛
 }
 
 export const PLATFORM_COLORS: Record<Platform, string> = {

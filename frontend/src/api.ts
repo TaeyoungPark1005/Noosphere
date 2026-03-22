@@ -49,3 +49,11 @@ export async function getSimulationStatus(sim_id: string): Promise<{ status: str
   if (!res.ok) throw new Error(`Status check failed: ${res.status}`)
   return res.json()
 }
+
+export async function deleteSimulation(sim_id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/simulate/${sim_id}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.detail ?? `Delete failed: ${res.status}`)
+  }
+}

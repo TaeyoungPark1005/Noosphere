@@ -1,7 +1,12 @@
 import ReactMarkdown from 'react-markdown'
 
 export function MarkdownView({ content }: { content: string | null | undefined }) {
-  if (!content?.trim()) {
+  // Normalize curly/smart quotes to ASCII so CommonMark bold delimiter rules work correctly
+  // e.g. **"text"** fails because " (U+201C) is a punctuation char that blocks left-flanking **
+  const normalized = content
+    ? content.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'")
+    : content
+  if (!normalized?.trim()) {
     return (
       <div style={{ padding: 48, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
         <div style={{ fontSize: 28, marginBottom: 12 }}>📄</div>
@@ -59,7 +64,7 @@ export function MarkdownView({ content }: { content: string | null | undefined }
           ),
         }}
       >
-        {content}
+        {normalized}
       </ReactMarkdown>
     </div>
   )

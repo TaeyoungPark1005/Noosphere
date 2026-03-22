@@ -433,7 +433,23 @@ interface ContextGraphProps {
   width?: number
 }
 
-export const ContextGraph = memo(function ContextGraph({ data, width }: ContextGraphProps) {
+export const ContextGraph = memo(function ContextGraph({ data, width: widthProp }: ContextGraphProps) {
+  // 0. 컨테이너 너비 자동 측정
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [measuredWidth, setMeasuredWidth] = useState<number>(widthProp ?? 520)
+  useEffect(() => {
+    if (widthProp !== undefined) return
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect.width
+      if (w) setMeasuredWidth(w)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [widthProp])
+  const width = widthProp ?? measuredWidth
+
   // 1. 소스 목록 (legend용)
   const usedSources = useMemo(
     () => [...new Set(data.nodes.map(n => n.source.split(':')[0]))],
@@ -477,6 +493,15 @@ export const ContextGraph = memo(function ContextGraph({ data, width }: ContextG
   }, [graphNodes, data.edges])
 
   const graphRef = useRef<ContextGraphHandle | undefined>(undefined)
+
+  // 반발력 설정 (MiroFish 참고: charge -400, collide 50)
+  useEffect(() => {
+    const fg = graphRef.current
+    if (!fg) return
+    fg.d3Force('charge')?.strength(-400)
+    fg.d3Force('link')?.distance(120)
+  }, [])
+
   const handleEngineStop = useCallback(() => {
     graphRef.current?.zoomToFit(400, 24)
   }, [])
@@ -517,7 +542,7 @@ export const ContextGraph = memo(function ContextGraph({ data, width }: ContextG
   }, [])
 
   return (
-    <div style={{ position: 'relative', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', background: '#f8fafc' }}>
+    <div ref={containerRef} style={{ position: 'relative', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', background: '#f8fafc' }}>
       {/* Legend */}
       <div style={{ padding: '7px 14px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
         {usedSources.map(src => {
@@ -561,8 +586,8 @@ export const ContextGraph = memo(function ContextGraph({ data, width }: ContextG
         ref={graphRef}
         graphData={graphData}
         width={width}
-        height={320}
-        warmupTicks={120}
+        height={520}
+        warmupTicks={200}
         cooldownTicks={0}
         onEngineStop={handleEngineStop}
         nodeId="id"

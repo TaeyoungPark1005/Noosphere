@@ -240,7 +240,7 @@ export function HomePage() {
         {/* Options toggle */}
         <div style={{ marginTop: 20 }}>
           <button
-            onClick={() => setOptionsOpen(o => !o)}
+            onClick={() => { setOptionsOpen(o => { if (!o) setOptionsTab('research'); return !o }) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               background: 'none', border: 'none', cursor: 'pointer',

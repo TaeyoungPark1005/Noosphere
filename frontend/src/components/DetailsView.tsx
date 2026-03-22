@@ -48,7 +48,7 @@ export function DetailsView({ posts, personas, forcedTab }: Props) {
         : (Object.fromEntries(
             Object.entries(posts).map(([platform, platformPosts]) => [
               platform,
-              (platformPosts ?? []).filter(p => p.round_num === activeRound),
+              (platformPosts ?? []).filter(p => Number(p.round_num) === activeRound),
             ])
           ) as Partial<Record<Platform, SocialPost[]>>),
     [posts, activeRound]
