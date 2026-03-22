@@ -6,39 +6,37 @@ import { MarkdownView } from './MarkdownView'
 import { PlatformSimFeed } from './PlatformSimFeed'
 import { PersonaCardView } from './PersonaCardView'
 import { SourcesView } from './SourcesView'
-import { OntologyGraph } from './OntologyGraph'
-import type { Platform, SocialPost, SimResults, OntologyData } from '../types'
+import { ContextGraph } from './OntologyGraph'
+import type { Platform, SocialPost, SimResults, ContextGraphData } from '../types'
 
-// ── Mock ontology (Noosphere domain map) ─────────────────────────────────────
+// ── Mock context graph (collected document graph) ─────────────────────────────
 
-const MOCK_ONTOLOGY: OntologyData = {
-  domain_summary: 'AI-driven pre-launch market intelligence — multi-agent simulation of developer community reactions.',
-  entities: [
-    { id: 'e0', name: 'Noosphere',              type: 'product',        source_node_ids: [] },
-    { id: 'e1', name: 'Multi-Agent Simulation', type: 'framework',      source_node_ids: [] },
-    { id: 'e2', name: 'LLM APIs',               type: 'technology',     source_node_ids: [] },
-    { id: 'e3', name: 'Pre-launch Validation',  type: 'pain_point',     source_node_ids: [] },
-    { id: 'e4', name: 'Developer Communities',  type: 'market_segment', source_node_ids: [] },
-    { id: 'e5', name: 'Market Research',        type: 'market_segment', source_node_ids: [] },
-    { id: 'e6', name: 'Generative Agents',      type: 'research',       source_node_ids: [] },
-    { id: 'e7', name: 'Social Simulation',      type: 'concept',        source_node_ids: [] },
-    { id: 'e8', name: 'Hacker News',            type: 'product',        source_node_ids: [] },
-    { id: 'e9', name: 'Product Hunt',           type: 'product',        source_node_ids: [] },
+const MOCK_GRAPH_DATA: ContextGraphData = {
+  nodes: [
+    { id: 's1', title: 'microsoft/autogen — Multi-Agent Framework',                   source: 'github',           url: 'https://github.com/microsoft/autogen' },
+    { id: 's2', title: 'LLM-based Multi-Agent Systems for Social Simulation',          source: 'arxiv',            url: 'https://arxiv.org/abs/2312.01234' },
+    { id: 's3', title: 'Ask HN: How do you validate product ideas before building?',   source: 'hackernews',       url: 'https://news.ycombinator.com/item?id=1' },
+    { id: 's4', title: 'stanfordnlp/dspy — Programming Foundation Models',             source: 'github',           url: 'https://github.com/stanfordnlp/dspy' },
+    { id: 's5', title: 'Generative Agents: Interactive Simulacra of Human Behavior',   source: 'arxiv',            url: 'https://arxiv.org/abs/2304.03442' },
+    { id: 's6', title: 'r/startups: What tools do you use for pre-launch validation?', source: 'reddit',           url: 'https://reddit.com/r/startups' },
+    { id: 's7', title: 'Top AI-powered research tools of 2024',                        source: 'product_hunt',     url: 'https://producthunt.com' },
+    { id: 's8', title: 'AgentSims: An Open-Source Sandbox for LLM Agent Evaluation',  source: 'arxiv',            url: 'https://arxiv.org/abs/2308.04026' },
+    { id: 's9', title: 'Attention Is All You Need',                                    source: 'arxiv',            url: 'https://arxiv.org/abs/1706.03762' },
+    { id: 's10', title: 'Show HN: I built a tool to simulate social media reactions', source: 'hackernews',       url: 'https://news.ycombinator.com' },
   ],
-  relationships: [
-    { from: 'e0', to: 'e1', type: 'built_on'        },
-    { from: 'e0', to: 'e2', type: 'built_on'        },
-    { from: 'e0', to: 'e3', type: 'addresses'       },
-    { from: 'e0', to: 'e4', type: 'targets'         },
-    { from: 'e0', to: 'e5', type: 'competes_with'   },
-    { from: 'e1', to: 'e7', type: 'enables'         },
-    { from: 'e6', to: 'e1', type: 'part_of'         },
-    { from: 'e2', to: 'e1', type: 'enables'         },
-    { from: 'e8', to: 'e4', type: 'part_of'         },
-    { from: 'e9', to: 'e4', type: 'part_of'         },
+  edges: [
+    { source: 's1', target: 's2', weight: 6, label: 'multi-agent · simulation' },
+    { source: 's1', target: 's4', weight: 4, label: 'LLM · framework' },
+    { source: 's2', target: 's5', weight: 7, label: 'agent simulation · social' },
+    { source: 's2', target: 's8', weight: 5, label: 'LLM agents · evaluation' },
+    { source: 's3', target: 's6', weight: 4, label: 'validation · startup' },
+    { source: 's3', target: 's10', weight: 5, label: 'HN · product validation' },
+    { source: 's5', target: 's8', weight: 6, label: 'generative agents · simulation' },
+    { source: 's5', target: 's9', weight: 4, label: 'transformer · attention' },
+    { source: 's4', target: 's9', weight: 3, label: 'language model' },
+    { source: 's6', target: 's7', weight: 3, label: 'product · market' },
+    { source: 's7', target: 's10', weight: 4, label: 'product launch · community' },
   ],
-  market_tensions: ['simulation fidelity vs. speed', 'AI-generated vs. real feedback'],
-  key_trends: ['LLM agent frameworks', 'pre-launch intelligence', 'community-native GTM'],
 }
 
 const PLATFORM_COLORS: Record<Platform, string> = {
@@ -345,15 +343,14 @@ function HomePhase({ displayText, runClicked }: { displayText: string; runClicke
 }
 
 function SimulatePhase({
-  sources, personaCount, personaPct, posts, simRound, ontology, autoSelectId, activePlatform,
+  sources, personaCount, personaPct, posts, simRound, graphData, activePlatform,
 }: {
   sources: typeof MOCK_SOURCES
   personaCount: number
   personaPct: number
   posts: SocialPost[]
   simRound: number
-  ontology: OntologyData | null
-  autoSelectId?: string
+  graphData: ContextGraphData | null
   activePlatform?: Platform
 }) {
   const showSources  = sources.length > 0
@@ -474,84 +471,19 @@ function SimulatePhase({
 
   return (
     <div style={{ background: '#f8fafc', height: '100%', overflowY: 'hidden' }}>
-      {ontology ? (
-        /* 2컬럼 — 온톨로지 수신 후 (SimulatePage와 동일) */
+      {graphData ? (
+        /* 2컬럼 — 그래프 수신 후 (SimulatePage와 동일) */
         <div style={{
           width: '100%', padding: '32px 24px',
           display: 'flex', gap: 24, alignItems: 'flex-start',
           boxSizing: 'border-box',
         }}>
-          {/* 좌측: Ecosystem Map + 노드 카드 */}
+          {/* 좌측: Knowledge Graph */}
           <div style={{ width: 360, flexShrink: 0, minWidth: 0, animation: 'fadeInUp 0.4s ease' }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 10px' }}>
-              Ecosystem Map
+              Knowledge Graph
             </p>
-            <OntologyGraph data={ontology} contextNodes={[]} width={360} />
-            {/* 선택 노드 인포 카드 (오버레이 없이 그래프 아래에 표시) */}
-            {autoSelectId && (() => {
-              const NODE_COLORS_DEMO: Record<string, string> = {
-                framework: '#3b82f6', product: '#22c55e', technology: '#a855f7',
-                market_segment: '#eab308', pain_point: '#ef4444', research: '#14b8a6',
-                concept: '#c084fc',
-              }
-              const REL_LABEL_DEMO: Record<string, string> = {
-                built_on: 'built on', addresses: 'addresses', targets: 'targets',
-                competes_with: 'competes with', enables: 'enables', part_of: 'part of',
-              }
-              const entity = ontology.entities.find(e => e.id === autoSelectId)
-              if (!entity) return null
-              const entityMap = Object.fromEntries(ontology.entities.map(e => [e.id, e]))
-              const outgoing = ontology.relationships.filter(r => r.from === entity.id)
-              const incoming = ontology.relationships.filter(r => r.to === entity.id)
-              const color = NODE_COLORS_DEMO[entity.type] ?? '#94a3b8'
-              return (
-                <div key={autoSelectId} style={{
-                  marginTop: 8, padding: '10px 12px', borderRadius: 8,
-                  background: 'rgba(15,23,42,0.92)', border: '1px solid rgba(255,255,255,0.08)',
-                  animation: 'fadeIn 0.25s ease',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
-                      background: color + '28', border: '1px solid ' + color + '60',
-                      color, textTransform: 'uppercase', letterSpacing: '0.05em',
-                    }}>{entity.type}</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}>{entity.name}</span>
-                    <span style={{ fontSize: 11, color: '#64748b', marginLeft: 'auto' }}>
-                      {outgoing.length + incoming.length} connections
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {outgoing.slice(0, 3).map((r, i) => {
-                      const tgt = entityMap[r.to]
-                      if (!tgt) return null
-                      return (
-                        <span key={i} style={{
-                          fontSize: 10, padding: '2px 7px', borderRadius: 10,
-                          background: 'rgba(255,255,255,0.06)',
-                          color: '#94a3b8',
-                        }}>
-                          → {REL_LABEL_DEMO[r.type] ?? r.type} <span style={{ color: '#cbd5e1', fontWeight: 600 }}>{tgt.name}</span>
-                        </span>
-                      )
-                    })}
-                    {incoming.slice(0, 2).map((r, i) => {
-                      const src = entityMap[r.from]
-                      if (!src) return null
-                      return (
-                        <span key={`in-${i}`} style={{
-                          fontSize: 10, padding: '2px 7px', borderRadius: 10,
-                          background: 'rgba(255,255,255,0.06)',
-                          color: '#64748b',
-                        }}>
-                          ← {REL_LABEL_DEMO[r.type] ?? r.type} <span style={{ color: '#94a3b8', fontWeight: 600 }}>{src.name}</span>
-                        </span>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })()}
+            <ContextGraph data={graphData} width={360} />
           </div>
           {/* 우측: 피드 */}
           <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
@@ -559,7 +491,7 @@ function SimulatePhase({
           </div>
         </div>
       ) : (
-        /* 1컬럼 — 온톨로지 수신 전 */
+        /* 1컬럼 — 그래프 수신 전 */
         <div style={{ padding: '36px 24px 20px' }}>
           {feedPanel}
         </div>
@@ -668,12 +600,11 @@ export function LandingDemoWindow() {
   const [typedChars,   setTypedChars]   = useState(0)
   const [runClicked,   setRunClicked]   = useState(false)
   const [sources,      setSources]      = useState<typeof MOCK_SOURCES>([])
-  const [ontology,     setOntology]     = useState<OntologyData | null>(null)
+  const [graphData,    setGraphData]    = useState<ContextGraphData | null>(null)
   const [personaCount, setPersonaCount] = useState(0)
   const [posts,        setPosts]        = useState<SocialPost[]>([])
   const [simRound,     setSimRound]     = useState(0)
   const [resultTab,    setResultTab]    = useState<ResultTab>('analysis')
-  const [autoSelectId,    setAutoSelectId]    = useState<string | undefined>(undefined)
   const [activePlatform,  setActivePlatform]  = useState<Platform | undefined>(undefined)
   const [visible,         setVisible]         = useState(true)
 
@@ -682,12 +613,11 @@ export function LandingDemoWindow() {
     setTypedChars(0)
     setRunClicked(false)
     setSources([])
-    setOntology(null)
+    setGraphData(null)
     setPersonaCount(0)
     setPosts([])
     setSimRound(0)
     setResultTab('analysis')
-    setAutoSelectId(undefined)
     setActivePlatform(undefined)
     setVisible(true)
 
@@ -711,10 +641,8 @@ export function LandingDemoWindow() {
     MOCK_SOURCES.forEach((src, i) => {
       at(i === 0 ? 350 : 320, () => setSources(prev => [src, ...prev]))
     })
-    at(500, () => { setSources([]); setOntology(MOCK_ONTOLOGY) })
-    at(800, () => setAutoSelectId('e0'))   // Noosphere 선택
-    at(2500, () => setAutoSelectId('e1'))  // Multi-Agent Simulation 으로 전환
-    at(2500, () => setAutoSelectId('e3'))  // Pre-launch Validation 으로 전환
+    at(500, () => setSources([]))
+    at(600, () => setGraphData(MOCK_GRAPH_DATA))
     MOCK_PERSONAS.forEach((_p, i) => {
       at(i === 0 ? 350 : 260, () => setPersonaCount(prev => prev + 1))
     })
@@ -818,8 +746,7 @@ export function LandingDemoWindow() {
             personaPct={personaPct}
             posts={posts}
             simRound={simRound}
-            ontology={ontology}
-            autoSelectId={autoSelectId}
+            graphData={graphData}
             activePlatform={activePlatform}
           />
         )}
