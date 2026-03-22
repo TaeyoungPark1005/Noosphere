@@ -1,31 +1,31 @@
-import pytest
 from unittest.mock import AsyncMock, patch
 from backend.llm import LLMResponse
 
+import pytest
 
-async def test_extract_concepts_returns_list():
-    mock_response = LLMResponse(content='["task management", "SaaS", "productivity"]', tool_name=None, tool_args=None)
+
+@pytest.mark.asyncio
+async def test_detect_domain_returns_trimmed_single_line_string():
+    mock_response = LLMResponse(
+        content='"developer tools"\nextra explanation',
+        tool_name=None,
+        tool_args=None,
+    )
     with patch("backend.context_builder.llm") as mock_llm:
         mock_llm.complete = AsyncMock(return_value=mock_response)
-        from backend.context_builder import extract_concepts_from_text
-        result = await extract_concepts_from_text("A SaaS app for task management", provider="openai")
-    assert isinstance(result, list)
-    assert len(result) > 0
+        from backend.context_builder import detect_domain
+
+        result = await detect_domain("A SaaS app for task management", provider="openai")
+
+    assert result == "developer tools"
 
 
-async def test_build_context_nodes_from_text_only():
-    mock_response = LLMResponse(content='["task management", "productivity"]', tool_name=None, tool_args=None)
+@pytest.mark.asyncio
+async def test_detect_domain_falls_back_to_technology_on_error():
     with patch("backend.context_builder.llm") as mock_llm:
-        mock_llm.complete = AsyncMock(return_value=mock_response)
-        from backend.context_builder import build_context_nodes
-        nodes = await build_context_nodes(
-            "A SaaS app for task management",
-            enrich=False,
-        )
-    assert len(nodes) >= 1
-    for node in nodes:
-        assert "id" in node
-        assert "title" in node
-        assert "source" in node
-        assert "abstract" in node
-        assert node["source"] == "input_text"
+        mock_llm.complete = AsyncMock(side_effect=RuntimeError("boom"))
+        from backend.context_builder import detect_domain
+
+        result = await detect_domain("A SaaS app for task management", provider="openai")
+
+    assert result == "technology"
