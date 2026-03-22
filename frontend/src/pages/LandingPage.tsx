@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
 import { LandingDemoWindow } from '../components/LandingDemoWindow'
 
 const SIMULATION_PLATFORMS = [
@@ -29,6 +30,19 @@ const STEPS = [
 ]
 
 export function LandingPage() {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    if (menuOpen) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [menuOpen])
+
   return (
     <div style={{
       background: '#f8fafc',
@@ -38,65 +52,129 @@ export function LandingPage() {
     }}>
 
       {/* ── Nav ──────────────────────────────────────────────────────── */}
-      <nav style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 48px',
-        background: '#fff',
-        borderBottom: '1px solid #e2e8f0',
-        position: 'sticky', top: 0, zIndex: 10,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: 7,
-            background: 'linear-gradient(135deg, #6355e0, #8070ff)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(99,85,224,0.28)',
-          }}>
-            <div style={{ width: 11, height: 11, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.85)' }} />
+      <div ref={menuRef} style={{ position: 'relative' }}>
+        <nav className="landing-nav" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 48px',
+          background: '#fff',
+          borderBottom: '1px solid #e2e8f0',
+          position: 'sticky', top: 0, zIndex: 10,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: 7,
+              background: 'linear-gradient(135deg, #6355e0, #8070ff)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(99,85,224,0.28)',
+            }}>
+              <div style={{ width: 11, height: 11, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.85)' }} />
+            </div>
+            <span style={{
+              fontFamily: "'IBM Plex Mono', monospace",
+              fontSize: 14, fontWeight: 500, color: '#1e293b',
+            }}>
+              Noosphere
+            </span>
           </div>
-          <span style={{
+
+          <div className="landing-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+            <a href="#how-it-works" style={{
+              fontSize: 13, color: '#64748b', textDecoration: 'none',
+              transition: 'color 0.15s',
+            }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#1e293b')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
+            >
+              How it works
+            </a>
+            <a href="#platforms" style={{
+              fontSize: 13, color: '#64748b', textDecoration: 'none',
+              transition: 'color 0.15s',
+            }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#1e293b')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
+            >
+              Platforms
+            </a>
+          </div>
+
+          <Link to="/app" className="landing-nav-signin" style={{
             fontFamily: "'IBM Plex Mono', monospace",
-            fontSize: 14, fontWeight: 500, color: '#1e293b',
-          }}>
-            Noosphere
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-          <a href="#how-it-works" style={{
-            fontSize: 13, color: '#64748b', textDecoration: 'none',
-            transition: 'color 0.15s',
+            fontSize: 12, fontWeight: 500, color: '#fff',
+            padding: '8px 18px', borderRadius: 7,
+            background: '#1e293b', textDecoration: 'none',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.14)',
+            transition: 'opacity 0.15s',
           }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#1e293b')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.82')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
           >
-            How it works
-          </a>
-          <a href="#platforms" style={{
-            fontSize: 13, color: '#64748b', textDecoration: 'none',
-            transition: 'color 0.15s',
-          }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#1e293b')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
-          >
-            Platforms
-          </a>
-        </div>
+            Sign in →
+          </Link>
 
-        <Link to="/app" style={{
-          fontFamily: "'IBM Plex Mono', monospace",
-          fontSize: 12, fontWeight: 500, color: '#fff',
-          padding: '8px 18px', borderRadius: 7,
-          background: '#1e293b', textDecoration: 'none',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.14)',
-          transition: 'opacity 0.15s',
-        }}
-          onMouseEnter={e => (e.currentTarget.style.opacity = '0.82')}
-          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-        >
-          Sign in →
-        </Link>
-      </nav>
+          {/* 햄버거 버튼 */}
+          <button
+            className="landing-hamburger"
+            onClick={() => setMenuOpen(o => !o)}
+            aria-label={menuOpen ? '메뉴 닫기' : '메뉴 열기'}
+            aria-expanded={menuOpen}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: 12, margin: -12,
+              display: 'none',
+              flexDirection: 'column', gap: 4,
+            }}
+          >
+            <span style={{
+              display: 'block', width: 20, height: 2, background: '#1e293b', borderRadius: 2,
+              transition: 'transform 0.25s ease, opacity 0.25s ease',
+              transform: menuOpen ? 'translateY(6px) rotate(45deg)' : 'none',
+            }} />
+            <span style={{
+              display: 'block', width: 20, height: 2, background: '#1e293b', borderRadius: 2,
+              transition: 'opacity 0.25s ease',
+              opacity: menuOpen ? 0 : 1,
+            }} />
+            <span style={{
+              display: 'block', width: 20, height: 2, background: '#1e293b', borderRadius: 2,
+              transition: 'transform 0.25s ease, opacity 0.25s ease',
+              transform: menuOpen ? 'translateY(-6px) rotate(-45deg)' : 'none',
+            }} />
+          </button>
+        </nav>
+
+        {/* 모바일 드롭다운 메뉴 */}
+        <div className={`landing-mobile-menu${menuOpen ? ' open' : ''}`}>
+          <div style={{ padding: '8px 0 12px' }}>
+            <a
+              href="#how-it-works"
+              onClick={() => setMenuOpen(false)}
+              style={{ display: 'block', padding: '10px 20px', fontSize: 14, color: '#475569', textDecoration: 'none' }}
+            >
+              How it works
+            </a>
+            <a
+              href="#platforms"
+              onClick={() => setMenuOpen(false)}
+              style={{ display: 'block', padding: '10px 20px', fontSize: 14, color: '#475569', textDecoration: 'none' }}
+            >
+              Platforms
+            </a>
+            <Link
+              to="/app"
+              onClick={() => setMenuOpen(false)}
+              style={{
+                display: 'block', margin: '6px 16px 0', padding: '10px 18px',
+                background: '#1e293b', color: '#fff', borderRadius: 8,
+                fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 500,
+                textDecoration: 'none', textAlign: 'center',
+              }}
+            >
+              Sign in →
+            </Link>
+          </div>
+        </div>
+      </div>
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <section style={{
@@ -122,7 +200,7 @@ export function LandingPage() {
           </span>
         </div>
 
-        <h1 style={{
+        <h1 className="landing-hero-h1" style={{
           fontFamily: "'Fraunces', serif",
           fontSize: 56, fontWeight: 600, lineHeight: 1.12,
           color: '#0f172a', margin: '0 0 18px',
@@ -141,7 +219,7 @@ export function LandingPage() {
           from GitHub, arXiv, and Hacker News.
         </p>
 
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 52 }}>
+        <div className="landing-hero-cta" style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 52 }}>
           <Link to="/app" style={{
             fontFamily: "'IBM Plex Mono', monospace",
             fontSize: 13, fontWeight: 500, color: '#fff',
@@ -195,7 +273,7 @@ export function LandingPage() {
           overflow: 'hidden', background: '#fff',
         }}>
           {STEPS.map((step, i) => (
-            <div key={step.num} style={{
+            <div key={step.num} className="landing-how-row" style={{
               display: 'flex', alignItems: 'flex-start', gap: 28,
               padding: '28px 36px',
               borderBottom: i < STEPS.length - 1 ? '1px solid #f1f5f9' : 'none',
@@ -207,8 +285,8 @@ export function LandingPage() {
               }}>
                 {step.num}
               </span>
-              <div style={{ width: 1, alignSelf: 'stretch', background: '#f1f5f9', flexShrink: 0 }} />
-              <div style={{ flexShrink: 0, minWidth: 160 }}>
+              <div className="landing-how-divider" style={{ width: 1, alignSelf: 'stretch', background: '#f1f5f9', flexShrink: 0 }} />
+              <div className="landing-how-title" style={{ flexShrink: 0, minWidth: 160 }}>
                 <span style={{
                   fontFamily: "'Fraunces', serif",
                   fontSize: 18, fontWeight: 600,
@@ -308,7 +386,7 @@ export function LandingPage() {
       </section>
 
       {/* ── Footer ───────────────────────────────────────────────────── */}
-      <footer style={{
+      <footer className="landing-footer" style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '20px 48px', borderTop: '1px solid #e2e8f0',
         background: '#f8fafc',
