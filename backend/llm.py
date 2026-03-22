@@ -286,10 +286,10 @@ async def _complete_anthropic(
     raise RuntimeError("Unreachable")
 
 
-_gemini_client = None
+_gemini_client: _genai.Client | None = None
 
 
-def _get_gemini_client():
+def _get_gemini_client() -> _genai.Client:
     global _gemini_client
     if _gemini_client is None:
         api_key = os.environ.get("GEMINI_API_KEY", "")

@@ -49,7 +49,7 @@ _TPM_REDIS_KEYS: dict[str, str] = {
 # ── Redis 클라이언트 (지연 초기화) ─────────────────────────────────────────
 _redis_client = None
 
-def _get_redis():
+def _get_redis() -> "redis.asyncio.Redis":
     global _redis_client
     if _redis_client is None:
         import redis.asyncio as _aioredis

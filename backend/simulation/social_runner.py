@@ -139,6 +139,7 @@ async def run_simulation(
 ) -> AsyncGenerator[dict, None]:
     nodes = context_nodes  # alias for rest of function body
     idea_text = input_text  # alias for rest of function body
+    platform_personas: dict[str, list[Persona]] = {}
     if not nodes:
         yield {"type": "sim_error", "message": "No context nodes to simulate"}
         yield {"type": "sim_done"}
@@ -170,9 +171,9 @@ async def run_simulation(
 
     if checkpoint is not None:
         # --- RESUME PATH ---
-        platform_personas = _restore_personas(checkpoint["personas"])
-        platform_states = _restore_platform_states(checkpoint["platform_states"])
-        start_round = checkpoint["last_round"] + 1
+        platform_personas = _restore_personas(checkpoint.get("personas", {}))
+        platform_states = _restore_platform_states(checkpoint.get("platform_states", {}))
+        start_round = _coerce_int(checkpoint.get("last_round"), 0) + 1
         yield {"type": "sim_resume", "from_round": start_round}
 
         # 이전 라운드 personas 재발행
@@ -210,9 +211,9 @@ async def run_simulation(
     else:
         # --- NORMAL PATH ---
         # Persona generation: one pool per platform, run in parallel
-        platform_personas: dict[str, list[Persona]] = {p.name: [] for p in active_platforms}
+        platform_personas = {p.name: [] for p in active_platforms}
 
-        async def collect_personas_for_platform(platform_name: str) -> list[tuple[dict, Persona]]:
+        async def collect_personas_for_platform(platform_name: str) -> list[tuple[dict, Persona | None]]:
             results = []
             async for event in round_personas(
                 clusters, idea_text,
@@ -385,7 +386,7 @@ async def run_simulation(
                     for p in personas_list
                 ]
                 for name, personas_list in platform_personas.items()
-            } if 'platform_personas' in dir() else {},
+            },
         },
     }
     yield {"type": "sim_done"}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import math
 
 from backend import llm
 
@@ -11,13 +12,22 @@ Given a list of real-world items gathered from GitHub, academic papers, HN, Redd
 write a concise structured landscape report in markdown."""
 
 
+def _coerce_score(value: object) -> float:
+    """Normalize score-like values for display and sorting."""
+    try:
+        score = float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    return score if math.isfinite(score) else 0.0
+
+
 def _fmt_items(items: list[dict], limit: int = 10) -> str:
     lines = []
     for it in items[:limit]:
         title = it.get("title", "?")
         url = it.get("url", "")
         source = it.get("source", "")
-        score = it.get("score", 0)
+        score = _coerce_score(it.get("score"))
         text = (it.get("text") or "")[:120].replace("\n", " ")
         lines.append(f"- [{title}]({url}) (source={source}, score={score:.1f}) — {text}")
     return "\n".join(lines) if lines else "_없음_"
@@ -41,7 +51,7 @@ async def generate_analysis_report(
         src = item.get("source", "unknown")
         by_source.setdefault(src, []).append(item)
 
-    top_items = sorted(raw_items, key=lambda x: -float(x.get("score", 0)))
+    top_items = sorted(raw_items, key=lambda x: -_coerce_score(x.get("score")))
 
     source_summary = "\n".join(
         f"- {src}: {len(items)}개" for src, items in sorted(by_source.items())

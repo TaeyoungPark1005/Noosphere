@@ -165,6 +165,7 @@ def update_simulation_status(
         set_clause = "status=?, finished_at=?"
         set_params.append(now)
     else:
+        # running 상태로 전환 시 finished_at을 초기화 (재개 시나리오)
         set_clause = "status=?, finished_at=NULL"
 
     if allowed_current_statuses:

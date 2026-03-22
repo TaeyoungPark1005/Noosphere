@@ -104,6 +104,14 @@ SIM_HEARTBEAT_TIMEOUT_SECONDS = int(os.getenv("SIM_HEARTBEAT_TIMEOUT_SECONDS", "
 REDIS_STREAM_ID_RE = re.compile(r"^(0|\d+-\d+)$")
 
 
+def _parse_allowed_origins(value: str | None) -> list[str]:
+    origins = [origin.strip() for origin in (value or "*").split(",") if origin.strip()]
+    return origins or ["*"]
+
+
+_allowed_origins = _parse_allowed_origins(os.getenv("ALLOWED_ORIGINS"))
+
+
 def _require_aioredis():
     if aioredis is None:
         raise HTTPException(503, "Redis client is not installed")
@@ -126,7 +134,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Noosphere v2", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

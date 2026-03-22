@@ -89,6 +89,7 @@ async def analyze(
 
     # Build tasks for non-GDELT sources
     source_coroutines: list[Coroutine[Any, Any, list[Any]]] = []
+    source_names_ordered: list[str] = []
 
     news_queries = query_bundles.get("news", [])
     gdelt_coro = None
@@ -111,6 +112,7 @@ async def analyze(
                     timeout=timeout_secs,
                 )
                 continue
+            source_names_ordered.append(source_name)
             source_coroutines.append(
                 _search_source(
                     source_name,
@@ -124,17 +126,7 @@ async def analyze(
     results_raw: list[Any] = []
     if source_coroutines:
         # Wrap each coroutine to fire the progress callback when it completes
-        source_names_ordered: list[str] = []
         wrapped: list[Coroutine[Any, Any, list[Any]]] = []
-
-        for category, source_names in CATEGORY_SOURCES.items():
-            queries = query_bundles.get(category, [])
-            if not queries:
-                continue
-            for source_name in source_names:
-                if source_name == "gdelt":
-                    continue
-                source_names_ordered.append(source_name)
 
         async def _wrap(coro: Coroutine, name: str) -> list[Any]:
             result = await coro

@@ -2,7 +2,7 @@ from __future__ import annotations
 import asyncio
 import re
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -320,7 +320,7 @@ def _build_typst(
     final_report_md: str | None = None,
 ) -> str:
     lang_code, fonts, labels = _LANG_SETTINGS.get(language, _LANG_SETTINGS["English"])
-    date_str = datetime.now().strftime("%Y-%m-%d")
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     idea_snippet = _escape_typst_markup(idea_text[:200])
     domain_escaped = _escape_typst_markup(domain)
     analysis_body = _md_to_typst(analysis_md) if analysis_md else labels["no_analysis"]

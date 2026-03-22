@@ -448,7 +448,7 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                 _enriched_nodes: list[dict] = []
                 _enriched_lock = asyncio.Lock()
                 _structurize_tasks: list[asyncio.Task] = []
-                _event_loop = asyncio.get_event_loop()
+                _event_loop = asyncio.get_running_loop()
 
                 async def _structurize_and_emit(item: dict) -> dict:
                     async with _structurize_sem:
