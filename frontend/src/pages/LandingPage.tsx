@@ -52,13 +52,12 @@ export function LandingPage() {
     }}>
 
       {/* ── Nav ──────────────────────────────────────────────────────── */}
-      <div ref={menuRef} style={{ position: 'relative' }}>
+      <div ref={menuRef} style={{ position: 'sticky', top: 0, zIndex: 10 }}>
         <nav className="landing-nav" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '14px 48px',
           background: '#fff',
           borderBottom: '1px solid #e2e8f0',
-          position: 'sticky', top: 0, zIndex: 10,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <div style={{
