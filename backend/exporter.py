@@ -16,6 +16,7 @@ def _escape_typst_markup(s: str) -> str:
     s = s.replace("\\", "\\\\")
     s = s.replace("#", "\\#")
     s = s.replace("@", "\\@")
+    s = s.replace("$", "\\$")
     s = s.replace("[", "\\[")
     s = s.replace("]", "\\]")
     return s
@@ -26,11 +27,18 @@ def _inline_md(text: str) -> str:
     text = text.replace("\\", "\\\\")
     text = text.replace("#", "\\#")
     text = text.replace("@", "\\@")
-    text = re.sub(
-        r"\[([^\]]+)\]\(([^)]+)\)",
-        lambda m: f'#link("{m.group(2)}")[{m.group(1)}]',
-        text,
-    )
+    text = text.replace("$", "\\$")
+    # Process Markdown links first, protect them from bracket escaping
+    _links: list[str] = []
+    def _replace_link(m: re.Match) -> str:
+        _links.append(f'#link("{m.group(2)}")[{m.group(1)}]')
+        return f"\x00LNK{len(_links) - 1}\x00"
+    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", _replace_link, text)
+    # Escape bare square brackets (common in LLM output, break Typst content blocks)
+    text = text.replace("[", "\\[").replace("]", "\\]")
+    # Restore protected links
+    for i, lnk in enumerate(_links):
+        text = text.replace(f"\x00LNK{i}\x00", lnk)
     _BOLD = "\x00B\x00"
     text = re.sub(r"\*\*(.+?)\*\*", lambda m: f"{_BOLD}{m.group(1)}{_BOLD}", text)
     text = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"_\1_", text)
@@ -318,13 +326,17 @@ def _build_typst(
     language: str = "English",
     sim_params: dict | None = None,
     final_report_md: str | None = None,
+    idea_title: str = "",
 ) -> str:
     lang_code, fonts, labels = _LANG_SETTINGS.get(language, _LANG_SETTINGS["English"])
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     idea_snippet = _escape_typst_markup(idea_text[:200])
     domain_escaped = _escape_typst_markup(domain)
+    title_escaped = _escape_typst_markup(idea_title) if idea_title else domain_escaped
     analysis_body = _md_to_typst(analysis_md) if analysis_md else labels["no_analysis"]
-    sim_body = _md_to_typst(report_md) if report_md else labels["no_simulation"]
+    # Fallback to final_report_md if sim report_md is missing (e.g. older DB rows)
+    _sim_md = report_md or final_report_md or ""
+    sim_body = _md_to_typst(_sim_md) if _sim_md else labels["no_simulation"]
     final_body = _md_to_typst(final_report_md) if final_report_md else labels["no_final_report"]
 
     params = sim_params or {}
@@ -345,7 +357,7 @@ def _build_typst(
 
     report_title_upper = labels["report_title"].upper()
 
-    return f"""#set document(title: "Noosphere — {domain_escaped}", date: auto)
+    return f"""#set document(title: "Noosphere — {title_escaped}", date: auto)
 
 // ── jastylest-zh: CJK 폰트 + CJK-Latin 간격 자동 보정 ──
 #set text(font: ({fonts}), size: 11pt, lang: "{lang_code}", cjk-latin-spacing: auto)
@@ -397,7 +409,7 @@ def _build_typst(
         columns: (1fr, auto),
         align: (left + horizon, right + horizon),
         [Noosphere],
-        [{domain_escaped}],
+        [{title_escaped}],
       )
       v(-0.45em)
       line(length: 100%, stroke: 0.4pt + luma(220))
@@ -418,11 +430,11 @@ def _build_typst(
     #set text(fill: white)
     #text(size: 9pt, tracking: 4pt, fill: luma(155))[NOOSPHERE]
     #v(1em)
-    #text(size: 26pt, weight: "bold")[{domain_escaped}]
+    #text(size: 26pt, weight: "bold")[{title_escaped}]
     #v(0.6em)
     #line(length: 3.5cm, stroke: 0.7pt + luma(95))
     #v(0.6em)
-    #text(size: 11pt, tracking: 0.8pt, fill: luma(185))[{report_title_upper}]
+    #text(size: 11pt, tracking: 0.8pt, fill: luma(185))[{domain_escaped} · {report_title_upper}]
   ]
   // 하단 흰 영역 ─ 아이디어 인용 + 메타
   #block(width: 100%, fill: white, inset: (x: 2.8cm, top: 2.2cm, bottom: 2.5cm))[
@@ -486,6 +498,7 @@ async def build_pdf(
     analysis_md: str | None = None,
     sim_params: dict | None = None,
     final_report_md: str | None = None,
+    idea_title: str = "",
 ) -> bytes:
     typ_content = _build_typst(
         domain=domain or input_text[:60],
@@ -495,6 +508,7 @@ async def build_pdf(
         language=language,
         sim_params=sim_params,
         final_report_md=final_report_md,
+        idea_title=idea_title,
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:

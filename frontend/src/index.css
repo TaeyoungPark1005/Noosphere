@@ -236,6 +236,9 @@ button:active:not(:disabled) {
   /* SimulatePage sourcing 2열 레이아웃 */
   .sim-sourcing-layout { flex-direction: column !important; }
 
+  /* SimulatePage knowledge graph height cap */
+  .sim-graph-wrapper { max-height: 220px; overflow: hidden; }
+
   /* HistoryPage item row */
   .history-item-row {
     flex-direction: column !important;

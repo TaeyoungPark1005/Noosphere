@@ -252,9 +252,11 @@ export function SimulatePage() {
             <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 10px' }}>
               Knowledge Graph
             </p>
-            <ContextGraph
-              data={sim.graphData ?? { nodes: [], edges: [] }}
-            />
+            <div className="sim-graph-wrapper">
+              <ContextGraph
+                data={sim.graphData ?? { nodes: [], edges: [] }}
+              />
+            </div>
           </div>
           <div style={{ flex: 2, minWidth: 0, paddingTop: 4 }}>
             {feedPanel}
