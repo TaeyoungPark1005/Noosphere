@@ -14,7 +14,8 @@ export function HistoryPage() {
   const navigate = useNavigate()
   const [items, setItems] = useState<HistoryItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [cancelling, setCancelling] = useState<string | null>(null)
+  const [cancellingIds, setCancellingIds] = useState<Record<string, boolean>>({})
+  const [cancelErrors, setCancelErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     getHistory()
@@ -24,14 +25,32 @@ export function HistoryPage() {
 
   const handleCancel = async (e: React.MouseEvent, simId: string) => {
     e.stopPropagation()
-    setCancelling(simId)
+    setCancellingIds(prev => ({ ...prev, [simId]: true }))
+    setCancelErrors(prev => {
+      if (!(simId in prev)) return prev
+      const next = { ...prev }
+      delete next[simId]
+      return next
+    })
     try {
       await cancelSimulation(simId)
       setItems(prev => prev.map(it => it.id === simId ? { ...it, status: 'failed' } : it))
-    } catch {
-      // ignore
+      setCancelErrors(prev => {
+        if (!(simId in prev)) return prev
+        const next = { ...prev }
+        delete next[simId]
+        return next
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to cancel simulation'
+      setCancelErrors(prev => ({ ...prev, [simId]: message }))
     } finally {
-      setCancelling(null)
+      setCancellingIds(prev => {
+        if (!(simId in prev)) return prev
+        const next = { ...prev }
+        delete next[simId]
+        return next
+      })
     }
   }
 
@@ -74,19 +93,26 @@ export function HistoryPage() {
                   </p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                     {item.status === 'running' && (
-                      <button
-                        onClick={e => handleCancel(e, item.id)}
-                        disabled={cancelling === item.id}
-                        style={{
-                          fontSize: 11, padding: '3px 10px', borderRadius: 8,
-                          border: '1px solid #fca5a5', background: '#fff',
-                          color: '#ef4444', cursor: 'pointer', fontWeight: 600,
-                          opacity: cancelling === item.id ? 0.5 : 1,
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        {cancelling === item.id ? 'Stopping...' : '■ Stop'}
-                      </button>
+                      <>
+                        <button
+                          onClick={e => handleCancel(e, item.id)}
+                          disabled={Boolean(cancellingIds[item.id])}
+                          style={{
+                            fontSize: 11, padding: '3px 10px', borderRadius: 8,
+                            border: '1px solid #fca5a5', background: '#fff',
+                            color: '#ef4444', cursor: 'pointer', fontWeight: 600,
+                            opacity: cancellingIds[item.id] ? 0.5 : 1,
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          {cancellingIds[item.id] ? 'Stopping...' : '■ Stop'}
+                        </button>
+                        {cancelErrors[item.id] && (
+                          <span style={{ fontSize: 11, color: '#ef4444' }}>
+                            {cancelErrors[item.id]}
+                          </span>
+                        )}
+                      </>
                     )}
                     <span style={{
                       fontSize: 11, padding: '2px 8px', borderRadius: 10,
