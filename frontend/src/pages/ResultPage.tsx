@@ -61,7 +61,7 @@ export function ResultPage() {
           <>
             {/* Verdict summary card — always visible */}
             {v && (
-              <div style={{
+              <div className="result-verdict-card" style={{
                 padding: '12px 18px', borderRadius: 10, marginBottom: 20,
                 border: `1px solid ${v.color}30`, background: `${v.color}08`,
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -87,7 +87,7 @@ export function ResultPage() {
             )}
 
             {/* Tab navigation */}
-            <div style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid #e2e8f0' }}>
+            <div className="result-tabs" style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid #e2e8f0' }}>
               {tabs.map(t => (
                 <button key={t.id} onClick={() => setTab(t.id)}
                   style={{
