@@ -32,7 +32,7 @@ def test_simulation_status_includes_checkpoint_round(db_path):
         "",
     )
     update_simulation_status(db_path, sim_id, "failed", allowed_current_statuses={"running"})
-    save_checkpoint(db_path, sim_id, 4, {}, {}, [], "domain", "", None, [])
+    save_checkpoint(db_path, sim_id, 4, {}, {}, [], "domain", "", [])
 
     response = asyncio.run(main.simulation_status(sim_id))
 
@@ -62,7 +62,7 @@ def test_resume_simulation_reuses_sim_id_as_task_id(db_path, monkeypatch):
         "",
     )
     update_simulation_status(db_path, sim_id, "failed", allowed_current_statuses={"running"})
-    save_checkpoint(db_path, sim_id, 2, {}, {}, [], "domain", "", None, [])
+    save_checkpoint(db_path, sim_id, 2, {}, {}, [], "domain", "", [])
 
     captured: dict[str, object] = {}
 

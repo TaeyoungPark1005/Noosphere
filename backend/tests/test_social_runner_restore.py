@@ -1,4 +1,7 @@
+import dataclasses
+
 from backend.simulation.models import Persona, PlatformState, SocialPost
+from backend.simulation.platforms.base import AbstractPlatform
 from backend.simulation.social_runner import _restore_personas, _restore_platform_states
 
 
@@ -59,6 +62,7 @@ def test_restore_platform_states_returns_platform_state_instances():
     assert state.platform_name == "hackernews"
     assert state.round_num == 2
     assert state.recent_speakers == {"n1": 1}
+    assert state.post_index["p1"] is state.posts[0]
 
 
 def test_restore_platform_states_restores_posts():
@@ -70,6 +74,80 @@ def test_restore_platform_states_restores_posts():
     assert post.id == "p1"
     assert post.structured_data == {"url": "http://example.com"}
     assert post.parent_id is None
+
+
+def test_platform_state_asdict_excludes_post_index():
+    state = PlatformState(
+        platform_name="hackernews",
+        posts=[
+            SocialPost(
+                id="p1",
+                platform="hackernews",
+                author_node_id="n1",
+                author_name="Alice",
+                content="Hello",
+                action_type="post",
+                round_num=0,
+            )
+        ],
+    )
+
+    serialized = dataclasses.asdict(state)
+
+    assert "post_index" not in serialized
+    assert state.post_index["p1"] is state.posts[0]
+
+
+def test_platform_state_add_post_updates_post_index():
+    state = PlatformState(platform_name="hackernews")
+    post = SocialPost(
+        id="p2",
+        platform="hackernews",
+        author_node_id="n2",
+        author_name="Bob",
+        content="Hi",
+        action_type="comment",
+        round_num=1,
+    )
+
+    state.add_post(post)
+
+    assert state.posts == [post]
+    assert state.post_index["p2"] is post
+
+
+def test_update_vote_counts_recovers_from_stale_post_index():
+    platform = AbstractPlatform()
+    state = PlatformState(platform_name="hackernews")
+    seed = SocialPost(
+        id="seed",
+        platform="hackernews",
+        author_node_id="__seed__",
+        author_name="Noosphere",
+        content="Seed",
+        action_type="post",
+        round_num=0,
+    )
+    reply = SocialPost(
+        id="reply",
+        platform="hackernews",
+        author_node_id="n1",
+        author_name="Alice",
+        content="Reply",
+        action_type="comment",
+        round_num=1,
+        parent_id="seed",
+    )
+    state.add_post(seed)
+
+    # Simulate an out-of-band append that bypassed add_post, such as an older code path.
+    state.posts.append(reply)
+
+    updated = platform.update_vote_counts(state, "reply", "upvote")
+
+    assert updated is reply
+    assert reply.upvotes == 1
+    assert state.post_index["reply"] is reply
 
 
 def test_restore_platform_states_empty():
