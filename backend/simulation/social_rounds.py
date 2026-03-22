@@ -70,6 +70,9 @@ def _build_prior_knowledge(
         score += len(_normalized_list(persona.tech_area) & _normalized_list(doc.get("_tech_area")))
         score += len(_normalized_list(persona.market) & _normalized_list(doc.get("_market")))
         score += len(_normalized_list(persona.problem_domain) & _normalized_list(doc.get("_problem_domain")))
+        # keywords/entities: 구체적 내용 기반 유사도 (분류 필드보다 가중치 높음)
+        score += len(_normalized_list(persona.interests) & _normalized_list(doc.get("_keywords"))) * 2
+        score += len(_normalized_list(persona.interests) & _normalized_list(doc.get("_entities"))) * 2
         return score
 
     ranked = sorted(docs, key=relevance_score, reverse=True)
@@ -90,48 +93,67 @@ def _build_prior_knowledge(
 
 def select_active_agents(
     personas: list[Persona],
-    degree: dict[str, int] | None,
     activation_rate: float = 0.25,
     recent_speakers: dict[str, int] | None = None,
     current_round: int = 0,
+    posts: list[SocialPost] | None = None,
 ) -> list[Persona]:
-    """Degree-weighted random selection with cross-round cooldown.
+    """70% new agents (3+ rounds idle, random) + 30% returning (replied-to first).
 
-    recent_speakers: node_id → last round they produced content (comment/reply).
-    Agents who spoke in the previous round get weight * 0.1.
-    Agents who spoke two rounds ago get weight * 0.5.
-    Always returns at least 1 agent even if all are on cooldown.
+    recent_speakers: node_id → last round they produced content.
+    posts: all platform posts used to find which returning agents received replies.
+    Always returns at least 1 agent.
     """
     k = max(1, round(len(personas) * activation_rate))
+    k_new = round(k * 0.7)
+    k_return = k - k_new
 
-    def _base_weight(p: Persona) -> float:
-        base = float(max(1, degree.get(p.node_id, 0)) if degree else 1.0)
-        if recent_speakers is None:
-            return base
-        last = recent_speakers.get(p.node_id, -99)
-        if last == current_round - 1:
-            return base * 0.1
-        if last == current_round - 2:
-            return base * 0.5
-        return base
+    speakers = recent_speakers or {}
 
-    # uniform fallback when degree is None and no cooldown
-    if degree is None and recent_speakers is None:
-        return random.sample(personas, min(k, len(personas)))
+    # New pool: agents idle for 3+ rounds (never-spoken agents always qualify)
+    new_pool = [
+        p for p in personas
+        if current_round - speakers.get(p.node_id, -99) >= 3
+    ]
+    random.shuffle(new_pool)
+    selected_new = new_pool[:k_new]
+    selected_ids = {p.node_id for p in selected_new}
 
-    weights = [_base_weight(p) for p in personas]
-    selected: list[Persona] = []
-    pool = list(zip(personas, weights))
-    while len(selected) < k and pool:
-        total = sum(w for _, w in pool)
-        r = random.uniform(0, total)
-        cumulative = 0.0
-        for i, (persona, w) in enumerate(pool):
-            cumulative += w
-            if r <= cumulative:
-                selected.append(persona)
-                pool.pop(i)
-                break
+    # NOTE: no surplus transfer — new-agent shortfall does NOT bleed into returning pool.
+    # This prevents the same agents from bypassing the cooldown.
+
+    # Returning pool: previously spoken, not already selected
+    returning_pool = [
+        p for p in personas
+        if p.node_id not in selected_ids and p.node_id in speakers
+    ]
+
+    # Prioritize returning agents whose posts received replies
+    if posts:
+        post_author: dict[str, str] = {post.id: post.author_node_id for post in posts}
+        replied_authors: set[str] = {
+            post_author[post.parent_id]
+            for post in posts
+            if post.parent_id and post.parent_id in post_author
+        }
+        prioritized = [p for p in returning_pool if p.node_id in replied_authors]
+        fallback = [p for p in returning_pool if p.node_id not in replied_authors]
+        random.shuffle(prioritized)
+        random.shuffle(fallback)
+        ordered_returning = prioritized + fallback
+    else:
+        random.shuffle(returning_pool)
+        ordered_returning = returning_pool
+
+    selected_return = ordered_returning[:k_return]
+    selected = selected_new + selected_return
+
+    # Fill remaining slots from leftover new pool (cooldown-eligible agents not yet picked)
+    if len(selected) < k:
+        leftover_ids = {p.node_id for p in selected}
+        extra = [p for p in new_pool[k_new:] if p.node_id not in leftover_ids]
+        selected += extra[:k - len(selected)]
+
     return selected
 
 
@@ -220,12 +242,19 @@ async def decide_action(
 ) -> AgentAction:
     """LLM call 1: decide action_type and target_post_id."""
     allowed = platform.get_allowed_actions(persona)
+    content_actions = [a for a in allowed if a not in platform.no_content_actions]
+    content_bias = (
+        f"IMPORTANT: You MUST choose a content-writing action ({', '.join(content_actions)}) "
+        f"unless there is truly nothing worth saying. Passive actions like upvote/flag should be rare exceptions. "
+        f"Aim to write substantive content at least 80% of the time.\n"
+    ) if content_actions else ""
     prompt = (
         f"Platform: {platform.name}\n"
         f"Your persona: {persona.name}, {persona.role} at {persona.company} "
         f"({persona.seniority}, {persona.affiliation}, age {persona.age})\n"
         f"Bias: {persona.bias_description()}\n"
         f"Allowed actions: {', '.join(allowed)}\n\n"
+        f"{content_bias}"
         f"{feed_text}\n\n"
         f"Choose one action from {allowed}. "
         f"For vote/react actions, pick a target_post_id from the feed. "
@@ -377,7 +406,6 @@ async def platform_round(
     platform: AbstractPlatform,
     state: PlatformState,
     personas: list[Persona],
-    degree: dict[str, int] | None,
     idea_text: str,
     round_num: int,
     language: str = "English",
@@ -387,9 +415,10 @@ async def platform_round(
 ) -> AsyncGenerator[dict, None]:
     """Run one round for a single platform. Yields streaming events."""
     active = select_active_agents(
-        personas, degree, activation_rate,
+        personas, activation_rate,
         recent_speakers=state.recent_speakers,
         current_round=round_num,
+        posts=state.posts,
     )
     state.round_num = round_num
     round_stats = {"active_agents": len(active), "new_posts": 0, "new_comments": 0, "new_votes": 0}
@@ -398,7 +427,14 @@ async def platform_round(
         feed_text = platform.build_feed(state)
         action = await decide_action(persona, platform, feed_text, language, provider=provider)
 
-        if platform.requires_content(action.action_type):
+        # Always generate content — votes/reactions are optional, but writing is mandatory
+        allowed = platform.get_allowed_actions(persona)
+        content_actions = [a for a in allowed if platform.requires_content(a)]
+        if not platform.requires_content(action.action_type) and content_actions:
+            # Override to content action; preserve target_post_id for reply context
+            action = AgentAction(action_type=content_actions[0], target_post_id=action.target_post_id)
+
+        if content_actions:
             content, structured_data = await generate_content(
                 persona, action, platform, feed_text, idea_text, language,
                 provider=provider,
@@ -424,7 +460,7 @@ async def platform_round(
             yield {"type": "sim_platform_post", "platform": platform.name,
                    "post": dataclasses.asdict(post)}
         else:
-            # Vote/react action
+            # Platform has no content actions (e.g., vote-only platform) — fall back to reaction
             target_id = action.target_post_id or f"__seed__{platform.name}"
             updated = platform.update_vote_counts(state, target_id, action.action_type)
             round_stats["new_votes"] += 1
@@ -563,7 +599,7 @@ async def generate_report(
 
     prompt = (
         f"Domain: {domain}\n"
-        f"Product: {idea_text[:400]}\n\n"
+        f"Product: {idea_text}\n\n"
         f"Simulation results across platforms:\n\n"
         + "\n\n".join(platform_summaries)
         + f"\n\nInstructions:\n"
@@ -607,34 +643,189 @@ async def generate_report(
     return report_json, report_md
 
 
+_REPORT_I18N: dict[str, dict[str, str]] = {
+    "Korean": {
+        "overall_verdict": "종합 평가",
+        "based_on": "{n}개의 시뮬레이션 인터랙션 기반",
+        "segment_reactions": "세그먼트별 반응",
+        "criticism_patterns": "비판 패턴",
+        "improvement_suggestions": "개선 제안",
+        "mentions": "{n}회 언급",
+        "seg_developer": "개발자",
+        "seg_investor": "투자자",
+        "seg_early_adopter": "얼리 어답터",
+        "seg_skeptic": "회의론자",
+        "seg_pm": "프로덕트 매니저",
+        "verdict_positive": "긍정적",
+        "verdict_mixed": "복합적",
+        "verdict_skeptical": "회의적",
+        "verdict_negative": "부정적",
+    },
+    "Japanese": {
+        "overall_verdict": "総合評価",
+        "based_on": "{n}件のシミュレーションインタラクションに基づく",
+        "segment_reactions": "セグメント別反応",
+        "criticism_patterns": "批判パターン",
+        "improvement_suggestions": "改善提案",
+        "mentions": "{n}回言及",
+        "seg_developer": "開発者",
+        "seg_investor": "投資家",
+        "seg_early_adopter": "アーリーアダプター",
+        "seg_skeptic": "懐疑論者",
+        "seg_pm": "プロダクトマネージャー",
+        "verdict_positive": "肯定的",
+        "verdict_mixed": "混合",
+        "verdict_skeptical": "懐疑的",
+        "verdict_negative": "否定的",
+    },
+    "Chinese": {
+        "overall_verdict": "综合评估",
+        "based_on": "基于{n}次模拟互动",
+        "segment_reactions": "细分市场反应",
+        "criticism_patterns": "批评模式",
+        "improvement_suggestions": "改进建议",
+        "mentions": "提及{n}次",
+        "seg_developer": "开发者",
+        "seg_investor": "投资者",
+        "seg_early_adopter": "早期采用者",
+        "seg_skeptic": "怀疑者",
+        "seg_pm": "产品经理",
+        "verdict_positive": "积极",
+        "verdict_mixed": "复杂",
+        "verdict_skeptical": "怀疑",
+        "verdict_negative": "消极",
+    },
+    "Spanish": {
+        "overall_verdict": "Veredicto General",
+        "based_on": "Basado en {n} interacciones simuladas",
+        "segment_reactions": "Reacciones por Segmento",
+        "criticism_patterns": "Patrones de Crítica",
+        "improvement_suggestions": "Sugerencias de Mejora",
+        "mentions": "mencionado {n} veces",
+        "seg_developer": "Desarrollador",
+        "seg_investor": "Inversor",
+        "seg_early_adopter": "Adoptante Temprano",
+        "seg_skeptic": "Escéptico",
+        "seg_pm": "Product Manager",
+        "verdict_positive": "Positivo",
+        "verdict_mixed": "Mixto",
+        "verdict_skeptical": "Escéptico",
+        "verdict_negative": "Negativo",
+    },
+    "French": {
+        "overall_verdict": "Verdict Global",
+        "based_on": "Basé sur {n} interactions simulées",
+        "segment_reactions": "Réactions par Segment",
+        "criticism_patterns": "Patterns de Critique",
+        "improvement_suggestions": "Suggestions d'Amélioration",
+        "mentions": "mentionné {n} fois",
+        "seg_developer": "Développeur",
+        "seg_investor": "Investisseur",
+        "seg_early_adopter": "Adopteur Précoce",
+        "seg_skeptic": "Sceptique",
+        "seg_pm": "Product Manager",
+        "verdict_positive": "Positif",
+        "verdict_mixed": "Mixte",
+        "verdict_skeptical": "Sceptique",
+        "verdict_negative": "Négatif",
+    },
+    "German": {
+        "overall_verdict": "Gesamtbewertung",
+        "based_on": "Basierend auf {n} simulierten Interaktionen",
+        "segment_reactions": "Segmentreaktionen",
+        "criticism_patterns": "Kritikuster",
+        "improvement_suggestions": "Verbesserungsvorschläge",
+        "mentions": "{n}x erwähnt",
+        "seg_developer": "Entwickler",
+        "seg_investor": "Investor",
+        "seg_early_adopter": "Early Adopter",
+        "seg_skeptic": "Skeptiker",
+        "seg_pm": "Produktmanager",
+        "verdict_positive": "Positiv",
+        "verdict_mixed": "Gemischt",
+        "verdict_skeptical": "Skeptisch",
+        "verdict_negative": "Negativ",
+    },
+    "Portuguese": {
+        "overall_verdict": "Veredicto Geral",
+        "based_on": "Baseado em {n} interações simuladas",
+        "segment_reactions": "Reações por Segmento",
+        "criticism_patterns": "Padrões de Crítica",
+        "improvement_suggestions": "Sugestões de Melhoria",
+        "mentions": "mencionado {n} vezes",
+        "seg_developer": "Desenvolvedor",
+        "seg_investor": "Investidor",
+        "seg_early_adopter": "Adotante Inicial",
+        "seg_skeptic": "Cético",
+        "seg_pm": "Gerente de Produto",
+        "verdict_positive": "Positivo",
+        "verdict_mixed": "Misto",
+        "verdict_skeptical": "Cético",
+        "verdict_negative": "Negativo",
+    },
+    "English": {
+        "overall_verdict": "Overall Verdict",
+        "based_on": "Based on {n} simulated interactions",
+        "segment_reactions": "Segment Reactions",
+        "criticism_patterns": "Criticism Patterns",
+        "improvement_suggestions": "Improvement Suggestions",
+        "mentions": "mentioned {n}x",
+        "seg_developer": "Developer",
+        "seg_investor": "Investor",
+        "seg_early_adopter": "Early Adopter",
+        "seg_skeptic": "Skeptic",
+        "seg_pm": "Product Manager",
+        "verdict_positive": "Positive",
+        "verdict_mixed": "Mixed",
+        "verdict_skeptical": "Skeptical",
+        "verdict_negative": "Negative",
+    },
+}
+
+
 def _render_report_md(report: dict, idea_text: str, language: str) -> str:
+    t = _REPORT_I18N.get(language, _REPORT_I18N["English"])
     verdict_emoji = _VERDICT_EMOJI.get(report.get("verdict", "mixed"), "⚖️")
+    verdict_raw = report.get("verdict", "mixed")
+    verdict_label = t.get(f"verdict_{verdict_raw}", verdict_raw.title())
+
+    seg_name_map = {
+        "developer": t["seg_developer"],
+        "investor": t["seg_investor"],
+        "early_adopter": t["seg_early_adopter"],
+        "skeptic": t["seg_skeptic"],
+        "pm": t["seg_pm"],
+    }
 
     lines = [
-        f"# Product Validation Report",
+        f"## {verdict_emoji} {t['overall_verdict']}: {verdict_label}",
+        f"*{t['based_on'].format(n=report.get('evidence_count', 0))}*",
         f"",
-        f"## {verdict_emoji} Overall Verdict: {report.get('verdict', 'N/A').title()}",
-        f"*Based on {report.get('evidence_count', 0)} simulated interactions*",
-        f"",
-        f"## Segment Reactions",
+        f"## {t['segment_reactions']}",
     ]
     for seg in report.get("segments", []):
         sentiment_icon = _SENTIMENT_ICON.get(seg.get("sentiment", "neutral"), "😐")
-        lines.append(f"### {sentiment_icon} {seg.get('name', '').replace('_', ' ').title()}")
+        seg_key = seg.get("name", "").lower()
+        seg_label = seg_name_map.get(seg_key, seg_key.replace("_", " ").title())
+        lines.append(f"### {sentiment_icon} {seg_label}")
         lines.append(seg.get("summary", ""))
         for q in seg.get("key_quotes", []):
+            q = q.strip().strip('"\u201c\u201d')
             lines.append(f'> "{q}"')
         lines.append("")
 
-    lines += ["## Criticism Patterns"]
+    lines += [f"## {t['criticism_patterns']}"]
     for cluster in report.get("criticism_clusters", []):
-        lines.append(f"### {cluster.get('theme', '')} ({cluster.get('count', 0)} mentions)")
+        n = cluster.get("count", 0)
+        lines.append(f"### {cluster.get('theme', '')} ({t['mentions'].format(n=n)})")
         for ex in cluster.get("examples", [])[:2]:
+            ex = ex.strip().strip('"\u201c\u201d')
             lines.append(f'- "{ex}"')
         lines.append("")
 
-    lines += ["## Improvement Suggestions"]
+    lines += [f"## {t['improvement_suggestions']}"]
     for imp in report.get("improvements", []):
-        lines.append(f"- **{imp.get('suggestion', '')}** *(mentioned {imp.get('frequency', 1)}x)*")
+        freq = imp.get("frequency", 1)
+        lines.append(f"- **{imp.get('suggestion', '')}** *({t['mentions'].format(n=freq)})*")
 
     return "\n".join(lines)

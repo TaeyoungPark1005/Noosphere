@@ -5,7 +5,7 @@ import logging
 from collections.abc import AsyncGenerator
 
 from backend.simulation.models import Persona, PlatformState, SocialPost
-from backend.simulation.graph_utils import build_adjacency, degree_centrality, build_clusters
+from backend.simulation.graph_utils import build_adjacency, build_clusters
 from backend.simulation.social_rounds import (
     round_personas, generate_seed_post, platform_round, generate_report
 )
@@ -136,9 +136,11 @@ async def run_simulation(
     activation_rate: float = 0.25,
     provider: str = "openai",
     checkpoint: dict | None = None,
+    seed_text: str | None = None,
 ) -> AsyncGenerator[dict, None]:
     nodes = context_nodes  # alias for rest of function body
     idea_text = input_text  # alias for rest of function body
+    seed_idea = seed_text or input_text  # seed posts use original text if provided
     platform_personas: dict[str, list[Persona]] = {}
     if not nodes:
         yield {"type": "sim_error", "message": "No context nodes to simulate"}
@@ -159,13 +161,11 @@ async def run_simulation(
     clusters = build_clusters(adjacency, all_node_ids, id_to_node)
     clusters = clusters[:max(1, max_agents)]
 
-    cluster_docs_map: dict[str, list[dict]] = {c["id"]: c["nodes"] for c in clusters}
-
-    node_degree = degree_centrality(adjacency, all_node_ids) if edges else {}
-    cluster_degree: dict[str, int] = {
-        c["id"]: sum(node_degree.get(n.get("id", ""), 0) for n in c["nodes"])
-        for c in clusters
-    }
+    # 모든 클러스터의 문서를 합쳐서 각 페르소나에게 공유
+    # _build_prior_knowledge가 relevance 점수로 top-5를 뽑으므로
+    # 클러스터 크기에 관계없이 모든 페르소나가 풍부한 사전지식을 가짐
+    all_context_docs = [node for c in clusters for node in c["nodes"]]
+    cluster_docs_map: dict[str, list[dict]] = {c["id"]: all_context_docs for c in clusters}
 
     yield {"type": "sim_start", "agent_count": len(clusters)}
 
@@ -250,7 +250,7 @@ async def run_simulation(
         # Round 0: seed posts for each platform (parallel)
         platform_states: dict[str, PlatformState] = {}
         seed_tasks = {
-            p.name: asyncio.create_task(generate_seed_post(p, idea_text, language, provider=provider))
+            p.name: asyncio.create_task(generate_seed_post(p, seed_idea, language, provider=provider))
             for p in active_platforms
         }
         for name, task in seed_tasks.items():
@@ -282,7 +282,7 @@ async def run_simulation(
                 logger.warning("No personas for platform %s, skipping round %d", plat.name, rn)
                 return events_out
             async for event in platform_round(
-                plat, state, plat_personas, cluster_degree, idea_text, rn, language, activation_rate,
+                plat, state, plat_personas, idea_text, rn, language, activation_rate,
                 provider=provider,
                 cluster_docs_map=cluster_docs_map,
             ):

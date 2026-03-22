@@ -83,12 +83,34 @@ def connected_components(
     return components
 
 
+def _node_affinity(a: dict, b: dict) -> int:
+    """두 노드 간 유사도 점수 (엣지 임계값과 무관하게 raw score 계산)."""
+    def to_set(v: object) -> set[str]:
+        if isinstance(v, list):
+            return {str(x).strip().lower() for x in v if str(x).strip()}
+        if isinstance(v, str):
+            return {p.strip().lower() for p in v.replace(";", ",").split(",") if p.strip()}
+        return set()
+
+    score = len(to_set(a.get("_entities")) & to_set(b.get("_entities"))) * 3
+    score += len(to_set(a.get("_keywords")) & to_set(b.get("_keywords"))) * 2
+    if a.get("_domain_type") and a.get("_domain_type") == b.get("_domain_type"):
+        score += 1
+    score += len(to_set(a.get("_tech_area")) & to_set(b.get("_tech_area")))
+    score += len(to_set(a.get("_market")) & to_set(b.get("_market")))
+    score += len(to_set(a.get("_problem_domain")) & to_set(b.get("_problem_domain")))
+    return score
+
+
 def build_clusters(
     adjacency: dict[str, list[tuple[str, float]]],
     all_node_ids: list[str],
     id_to_node: dict[str, dict],
 ) -> list[dict]:
     """Build clusters from connected components of the keyword graph.
+
+    고립 노드(연결 없는 노드)는 가장 유사한 클러스터에 강제 배정하여
+    모든 문서가 반드시 어딘가에 소속되도록 한다.
 
     Returns list of cluster dicts sorted by size desc.
     Each cluster: {"id": str, "nodes": list[dict], "representative": dict}
@@ -97,8 +119,15 @@ def build_clusters(
     components = connected_components(adjacency, all_node_ids)
     deg = degree_centrality(adjacency, all_node_ids)
 
+    # connected component → cluster (크기 2 이상만 먼저)
+    multi_comps = sorted(
+        [c for c in components if len(c) >= 2],
+        key=lambda c: -len(c),
+    )
+    isolated_ids = [c[0] for c in components if len(c) == 1]
+
     clusters: list[dict] = []
-    for i, comp in enumerate(sorted(components, key=lambda c: -len(c))):
+    for i, comp in enumerate(multi_comps):
         nodes = [id_to_node[nid] for nid in comp if nid in id_to_node]
         if not nodes:
             continue
@@ -108,7 +137,37 @@ def build_clusters(
             "nodes": nodes,
             "representative": representative,
         })
-    return clusters
+
+    # 고립 노드를 가장 유사한 클러스터에 배정
+    # 매칭되는 클러스터가 없으면 독립 클러스터로 유지
+    unmatched: list[str] = []
+    for iso_id in isolated_ids:
+        iso_node = id_to_node.get(iso_id)
+        if iso_node is None:
+            continue
+        best_score, best_idx = 0, -1
+        for idx, cluster in enumerate(clusters):
+            for member in cluster["nodes"]:
+                s = _node_affinity(iso_node, member)
+                if s > best_score:
+                    best_score, best_idx = s, idx
+                    break  # 해당 클러스터에서 첫 매칭만 확인 (성능)
+        if best_idx >= 0:
+            clusters[best_idx]["nodes"].append(iso_node)
+        else:
+            unmatched.append(iso_id)
+
+    # 매칭 못 된 노드는 독립 클러스터로
+    for i, nid in enumerate(unmatched):
+        node = id_to_node.get(nid)
+        if node:
+            clusters.append({
+                "id": f"cluster_iso_{i}",
+                "nodes": [node],
+                "representative": node,
+            })
+
+    return sorted(clusters, key=lambda c: -len(c["nodes"]))
 
 
 def summarize_graph(

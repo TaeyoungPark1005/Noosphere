@@ -13,6 +13,7 @@ from backend.celery_app import celery_app, REDIS_URL
 from backend.db import (
     save_sim_results,
     update_simulation_status,
+    update_simulation_domain,
     DB_PATH,
     mark_simulation_started,
     touch_simulation_heartbeat,
@@ -42,6 +43,13 @@ _MARKETS = {"B2B", "B2C", "enterprise", "developer", "consumer", "academic"}
 _PROBLEM_DOMAINS = {
     "automation", "analytics", "communication", "productivity",
     "infrastructure", "security", "UX", "compliance",
+}
+
+# entities에서 제거할 플랫폼/소스 이름 (노드 간 의미없는 연결 방지)
+_ENTITY_BLOCKLIST = {
+    "reddit", "hackernews", "hacker news", "github", "producthunt", "product hunt",
+    "indiehackers", "indie hackers", "linkedin", "twitter", "youtube",
+    "google", "apple", "amazon", "microsoft",
 }
 
 
@@ -134,7 +142,7 @@ def _build_keyword_edges(nodes: list[dict], min_overlap: int = 2) -> list[dict]:
     return edges
 
 
-def _build_structured_edges(nodes: list[dict], min_score: int = 2) -> list[dict]:
+def _build_structured_edges(nodes: list[dict], min_score: int = 8) -> list[dict]:
     """구조화 필드 기반 가중 엣지 빌딩."""
     edges: list[dict] = []
     node_list = [n for n in nodes if n.get("id")]
@@ -234,6 +242,59 @@ def _calc_edges_for_node(new_node: dict, existing_nodes: list[dict], min_score: 
     return edges
 
 
+async def _summarize_idea_node(input_text: str, provider: str) -> dict:
+    """사용자 아이디어를 1000자 이내로 요약하고 구조화된 그래프 노드로 변환."""
+    from backend import llm as _llm
+
+    prompt = f"""Analyze this product idea and extract structured metadata.
+
+Product idea:
+{input_text[:4000]}
+
+Return a JSON object with exactly these fields:
+- summary: concise product summary under 1000 characters (clean prose, remove excess whitespace and special characters)
+- title: product name or core value proposition (under 80 chars)
+- domain_type: exactly ONE of [tech, research, consumer, business, healthcare, general]
+- tech_area: 1-2 items from [AI/ML, cloud, security, data, mobile, web, hardware, other]
+- market: 1-2 items from [B2B, B2C, enterprise, developer, consumer, academic]
+- problem_domain: 1-2 items from [automation, analytics, communication, productivity, infrastructure, security, UX, compliance]
+- keywords: 5-10 specific technical terms (free form)
+- entities: product/company/technology proper nouns (free form)"""
+
+    try:
+        resp = await _llm.complete(
+            messages=[{"role": "user", "content": prompt}],
+            tier="low",
+            provider=provider,
+            max_tokens=768,
+            response_format={"type": "json_object"},
+        )
+        data = json.loads(resp.content)
+    except Exception as exc:
+        logger.warning("_summarize_idea_node failed: %s", exc)
+        data = {}
+
+    raw_title = data.get("title") if isinstance(data.get("title"), str) else ""
+    if not raw_title.strip():
+        raw_title = next((line.strip() for line in input_text.splitlines() if line.strip()), input_text)
+    title = raw_title.strip()[:80]
+
+    data = _normalize_structured_payload(data, input_text[:1000])
+    return {
+        "id": "idea",
+        "title": title,
+        "source": "idea",
+        "url": "",
+        "abstract": data["summary"],
+        "_domain_type": data["domain_type"],
+        "_tech_area": data["tech_area"],
+        "_market": data["market"],
+        "_problem_domain": data["problem_domain"],
+        "_keywords": data["keywords"],
+        "_entities": data["entities"],
+    }
+
+
 async def _structurize_node(item: dict, provider: str) -> dict:
     """LLM으로 문서 1개를 구조화 JSON으로 변환."""
     from backend import llm as _llm
@@ -268,6 +329,10 @@ Return a JSON object with exactly these fields:
         data = {}
     data = _normalize_structured_payload(data, content)
 
+    filtered_entities = [
+        e for e in data["entities"]
+        if e.lower() not in _ENTITY_BLOCKLIST
+    ]
     return {
         "id": item["id"],
         "title": title,
@@ -279,7 +344,7 @@ Return a JSON object with exactly these fields:
         "_market": data["market"],
         "_problem_domain": data["problem_domain"],
         "_keywords": data["keywords"],
-        "_entities": data["entities"],
+        "_entities": filtered_entities,
     }
 
 
@@ -441,11 +506,23 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                 # and tasks.py will forward it to Redis via the normal event loop below
             else:
                 # Fresh run: run analysis pipeline
+                publish({"type": "sim_progress", "message": "Analyzing your idea..."})
+                idea_node = await _summarize_idea_node(config["input_text"], provider)
+                publish({
+                    "type": "sim_graph_node",
+                    "node": {
+                        "id": idea_node["id"],
+                        "title": idea_node.get("title", ""),
+                        "source": idea_node.get("source", ""),
+                        "url": idea_node.get("url", ""),
+                    },
+                })
+
                 publish({"type": "sim_progress", "message": "Searching external sources..."})
 
                 # 소스 발견과 동시에 LLM 구조화를 병렬 실행 → 그래프 실시간 생성
                 _structurize_sem = asyncio.Semaphore(5)
-                _enriched_nodes: list[dict] = []
+                _enriched_nodes: list[dict] = [idea_node]  # 아이디어 노드로 초기화 → 외부 소스들이 자동으로 엣지 연결
                 _enriched_lock = asyncio.Lock()
                 _structurize_tasks: list[asyncio.Task] = []
                 _event_loop = asyncio.get_running_loop()
@@ -500,16 +577,12 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                 # 진행 중인 구조화 태스크 모두 완료 대기
                 if _structurize_tasks:
                     _results = await asyncio.gather(*_structurize_tasks, return_exceptions=True)
-                    context_nodes = [n for n in _results if isinstance(n, dict)]
+                    context_nodes = [idea_node] + [n for n in _results if isinstance(n, dict)]
                 else:
-                    context_nodes = [{
-                        "id": "input",
-                        "title": config["input_text"][:80],
-                        "source": "input_text",
-                        "abstract": config["input_text"][:300],
-                    }]
+                    context_nodes = [idea_node]
 
                 domain_str = await detect_domain(config["input_text"], provider=provider)
+                await asyncio.to_thread(update_simulation_domain, DB_PATH, sim_id, domain_str)
 
                 publish({
                     "type": "sim_progress",
@@ -518,7 +591,7 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                 analysis_md = await generate_analysis_report(
                     raw_items=raw_items,
                     domain=domain_str,
-                    input_text=config["input_text"],
+                    input_text=idea_node["abstract"],
                     language=config["language"],
                     provider=provider,
                 )
@@ -528,13 +601,17 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
             context_nodes = _rank_nodes_by_relevance(context_nodes, config["input_text"])
             edges = _build_structured_edges(context_nodes)
 
+            _idea_node = next((n for n in context_nodes if n.get("id") == "idea"), None)
+            idea_summary = _idea_node["abstract"] if _idea_node else config["input_text"]
+
             publish({
                 "type": "sim_progress",
                 "message": f"Starting simulation with {len(context_nodes)} context nodes...",
             })
 
             async for event in run_simulation(
-                input_text=config["input_text"],
+                input_text=idea_summary,
+                seed_text=config["input_text"],
                 context_nodes=context_nodes,
                 domain=domain_str,
                 max_agents=config["max_agents"],
@@ -562,6 +639,8 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                         raw_items,
                     )
                     continue  # do NOT publish to Redis
+                if event["type"] == "sim_done":
+                    continue  # defer sim_done until after DB save
                 if event["type"] == "sim_report":
                     data = event["data"]
                     posts_by_platform = data.get("platform_states", {})
@@ -576,7 +655,7 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                 final_report_md = await generate_final_report(
                     analysis_md=analysis_md,
                     report_json=report_json,
-                    input_text=config["input_text"],
+                    input_text=idea_summary,
                     language=config["language"],
                     provider=provider,
                 )
@@ -611,6 +690,8 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                     "Simulation %s reached completion after its status changed; leaving DB status untouched",
                     sim_id,
                 )
+            # DB 저장 완료 후 sim_done 발행 → 프론트가 이 시점에 navigate
+            publish({"type": "sim_done"})
         except asyncio.CancelledError:
             logger.info("Simulation %s cancelled", sim_id)
             publish({"type": "sim_error", "message": USER_CANCEL_MESSAGE})
