@@ -9,6 +9,7 @@ from collections.abc import AsyncGenerator
 from backend.simulation.models import Persona, SocialPost, PlatformState
 from backend.simulation.persona_generator import generate_persona
 from backend.simulation.platforms.base import AbstractPlatform, AgentAction
+from backend.simulation.taxonomy import coerce_string_list as _coerce_string_list
 from backend import llm
 from backend.llm import LLMToolRequired
 
@@ -16,21 +17,24 @@ logger = logging.getLogger(__name__)
 
 
 def _normalized_value(value: object) -> str:
+    """Return lowercased stripped string, or empty string if not a non-empty str."""
     return str(value).strip().lower() if isinstance(value, str) and value.strip() else ""
 
 
 def _normalized_list(value: object) -> set[str]:
-    if isinstance(value, str):
-        items = [
-            part.strip()
-            for part in value.replace("\n", ",").replace(";", ",").split(",")
-            if part.strip()
-        ]
-    elif isinstance(value, list):
-        items = [str(part).strip() for part in value if str(part).strip()]
-    else:
-        items = []
-    return {item.lower() for item in items}
+    """Return a lowercase set of items from a string or list using taxonomy coerce_string_list."""
+    return {item.lower() for item in _coerce_string_list(value)}
+
+
+# ── Report rendering constants ────────────────────────────────────────────────
+
+_VERDICT_EMOJI: dict[str, str] = {
+    "positive": "✅",
+    "mixed": "⚖️",
+    "skeptical": "🤔",
+    "negative": "❌",
+}
+_SENTIMENT_ICON: dict[str, str] = {"positive": "👍", "neutral": "😐", "negative": "👎"}
 
 
 def _to_openai_tool(tool: dict) -> dict:
@@ -411,7 +415,7 @@ async def platform_round(
                 parent_id=action.target_post_id,
                 structured_data=structured_data,
             )
-            state.posts.append(post)
+            state.add_post(post)
             state.recent_speakers[persona.node_id] = round_num
             if action.target_post_id:
                 round_stats["new_comments"] += 1
@@ -604,9 +608,7 @@ async def generate_report(
 
 
 def _render_report_md(report: dict, idea_text: str, language: str) -> str:
-    verdict_emoji = {
-        "positive": "✅", "mixed": "⚖️", "skeptical": "🤔", "negative": "❌"
-    }.get(report.get("verdict", "mixed"), "⚖️")
+    verdict_emoji = _VERDICT_EMOJI.get(report.get("verdict", "mixed"), "⚖️")
 
     lines = [
         f"# Product Validation Report",
@@ -617,9 +619,7 @@ def _render_report_md(report: dict, idea_text: str, language: str) -> str:
         f"## Segment Reactions",
     ]
     for seg in report.get("segments", []):
-        sentiment_icon = {"positive": "👍", "neutral": "😐", "negative": "👎"}.get(
-            seg.get("sentiment", "neutral"), "😐"
-        )
+        sentiment_icon = _SENTIMENT_ICON.get(seg.get("sentiment", "neutral"), "😐")
         lines.append(f"### {sentiment_icon} {seg.get('name', '').replace('_', ' ').title()}")
         lines.append(seg.get("summary", ""))
         for q in seg.get("key_quotes", []):

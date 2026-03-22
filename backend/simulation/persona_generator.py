@@ -3,6 +3,14 @@ from __future__ import annotations
 import logging
 import random
 from backend.simulation.models import Persona
+from backend.simulation.taxonomy import (
+    coerce_enum,
+    coerce_string_list,
+    DOMAIN_TYPES,
+    TECH_AREAS,
+    MARKETS,
+    PROBLEM_DOMAINS,
+)
 from backend import llm
 from backend.llm import LLMToolRequired
 from backend.ontology_builder import ontology_for_persona
@@ -63,57 +71,6 @@ _PLATFORM_AUDIENCE = {
     ),
 }
 
-_DOMAIN_TYPES = {"tech", "research", "consumer", "business", "healthcare", "general"}
-_TECH_AREAS = {"AI/ML", "cloud", "security", "data", "mobile", "web", "hardware", "other"}
-_MARKETS = {"B2B", "B2C", "enterprise", "developer", "consumer", "academic"}
-_PROBLEM_DOMAINS = {
-    "automation", "analytics", "communication", "productivity",
-    "infrastructure", "security", "UX", "compliance",
-}
-
-
-def _coerce_enum(value: object, allowed: set[str]) -> str:
-    if not isinstance(value, str):
-        return ""
-    text = value.strip()
-    if text in allowed:
-        return text
-    lowered = text.lower()
-    for option in allowed:
-        if option.lower() == lowered:
-            return option
-    return ""
-
-
-def _coerce_string_list(
-    value: object,
-    *,
-    allowed: set[str] | None = None,
-    max_items: int | None = None,
-) -> list[str]:
-    if isinstance(value, str):
-        raw_items = [part.strip() for part in value.replace("\n", ",").replace(";", ",").split(",") if part.strip()]
-    elif isinstance(value, list):
-        raw_items = [str(part).strip() for part in value if str(part).strip()]
-    else:
-        raw_items = []
-
-    seen: set[str] = set()
-    items: list[str] = []
-    for item in raw_items:
-        normalized = item
-        if allowed is not None:
-            normalized = _coerce_enum(item, allowed)
-            if not normalized:
-                continue
-        dedupe_key = normalized.lower()
-        if dedupe_key in seen:
-            continue
-        seen.add(dedupe_key)
-        items.append(normalized)
-        if max_items is not None and len(items) >= max_items:
-            break
-    return items
 
 _PERSONA_TOOL = {
     "type": "function",
@@ -349,10 +306,10 @@ async def generate_persona(
         interests = []
     interests = interests[:8] or ["general"]
 
-    domain_type = _coerce_enum(data.get("domain_type"), _DOMAIN_TYPES)
-    tech_area = _coerce_string_list(data.get("tech_area"), allowed=_TECH_AREAS, max_items=2)
-    market = _coerce_string_list(data.get("market"), allowed=_MARKETS, max_items=2)
-    problem_domain = _coerce_string_list(data.get("problem_domain"), allowed=_PROBLEM_DOMAINS, max_items=2)
+    domain_type = coerce_enum(data.get("domain_type"), DOMAIN_TYPES)
+    tech_area = coerce_string_list(data.get("tech_area"), allowed=TECH_AREAS, max_items=2)
+    market = coerce_string_list(data.get("market"), allowed=MARKETS, max_items=2)
+    problem_domain = coerce_string_list(data.get("problem_domain"), allowed=PROBLEM_DOMAINS, max_items=2)
 
     return Persona(
         node_id=cluster_id,
