@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Header } from '../components/Header'
 import { useSimulation } from '../hooks/useSimulation'
 import { PlatformSimFeed } from '../components/PlatformSimFeed'
-import { OntologyGraph } from '../components/OntologyGraph'
+import { ContextGraph } from '../components/OntologyGraph'
 import { SOURCE_COLORS } from '../constants'
 import { resumeSimulation } from '../api'
 import type { Platform, SocialPost } from '../types'
@@ -243,8 +243,8 @@ export function SimulatePage() {
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
       <Header />
 
-      {sim.ontology ? (
-        /* 2컬럼 레이아웃 — 온톨로지 수신 후 */
+      {sim.graphData ? (
+        /* 2컬럼 레이아웃 — 그래프 데이터 수신 후 */
         <main className="page-enter" style={{
           maxWidth: 1280, margin: '0 auto', padding: '16px 24px',
           display: 'flex', gap: 24, alignItems: 'flex-start',
@@ -256,11 +256,10 @@ export function SimulatePage() {
             animation: 'fadeInUp 0.4s ease',
           }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 10px' }}>
-              Ecosystem Map
+              Knowledge Graph
             </p>
-            <OntologyGraph
-              data={sim.ontology}
-              contextNodes={[]}
+            <ContextGraph
+              data={sim.graphData}
               width={420}
             />
           </div>
@@ -271,7 +270,7 @@ export function SimulatePage() {
           </div>
         </main>
       ) : (
-        /* 1컬럼 레이아웃 — 온톨로지 수신 전 */
+        /* 1컬럼 레이아웃 — 그래프 데이터 수신 전 */
         <main className="page-enter" style={{ maxWidth: 720, margin: '0 auto', padding: '48px 24px' }}>
           {feedPanel}
         </main>

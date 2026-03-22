@@ -1,7 +1,7 @@
 // frontend/src/components/OntologyGraph.tsx
 import { useState, useCallback, useMemo, memo, useRef, useEffect } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
-import type { OntologyEntity, OntologyRelationship, OntologyData } from '../types'
+import type { OntologyEntity, OntologyRelationship, OntologyData, ContextGraphData } from '../types'
 
 const NODE_COLORS: Record<string, string> = {
   framework:      '#3b82f6',
@@ -288,6 +288,7 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
         <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>{data.domain_summary}</p>
       </div>
 
+
       {/* Legend */}
       <div style={{ padding: '7px 14px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
         {usedTypes.map(type => (
@@ -319,7 +320,9 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
           cooldownTicks={0}
           onEngineStop={handleEngineStop}
           nodeId="id"
+          // @ts-expect-error ForceGraph2D generic node type mismatch
           nodeLabel={(node: GraphNode) => `${node.name} · ${node.type}`}
+          // @ts-expect-error ForceGraph2D generic node type mismatch
           nodeColor={getNodeColor}
           nodeRelSize={6}
           linkColor={getLinkColor}
@@ -344,6 +347,178 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
           />
         )}
       </div>
+    </div>
+  )
+})
+
+// ── ContextGraph ───────────────────────────────────────────────────────────────
+
+const SOURCE_COLORS: Record<string, string> = {
+  arxiv:        '#a855f7',
+  s2:           '#6366f1',
+  hackernews:   '#f97316',
+  reddit:       '#ef4444',
+  github:       '#22c55e',
+  product_hunt: '#ec4899',
+  gdelt:        '#eab308',
+  input_text:   '#64748b',
+}
+
+function getSourceColor(source: string): string {
+  for (const [key, color] of Object.entries(SOURCE_COLORS)) {
+    if (source.startsWith(key) || source === key) return color
+  }
+  return '#94a3b8'
+}
+
+interface ContextGraphProps {
+  data: ContextGraphData
+  width?: number
+}
+
+export const ContextGraph = memo(function ContextGraph({ data, width }: ContextGraphProps) {
+  // 1. 소스 목록 (legend용)
+  const usedSources = useMemo(
+    () => [...new Set(data.nodes.map(n => n.source.split(':')[0]))],
+    [data.nodes]
+  )
+
+  // 2. 숨겨진 소스 (legend 토글용)
+  const [hiddenSources, setHiddenSources] = useState<Set<string>>(new Set())
+  const toggleSource = useCallback((src: string) => {
+    setHiddenSources(prev => {
+      const next = new Set(prev)
+      next.has(src) ? next.delete(src) : next.add(src)
+      return next
+    })
+  }, [])
+
+  // 3. hover된 엣지 (강조용)
+  const [hoveredLink, setHoveredLink] = useState<string | null>(null) // "sourceId→targetId"
+
+  // 4. graphData (filtered)
+  const graphNodes = useMemo(() =>
+    data.nodes
+      .filter(n => !hiddenSources.has(n.source.split(':')[0]))
+      .map(n => ({
+        ...n,
+        color: getSourceColor(n.source.split(':')[0]),
+      })),
+    [data.nodes, hiddenSources]
+  )
+
+  const graphData = useMemo(() => {
+    const visibleIds = new Set(graphNodes.map(n => n.id))
+    const links = data.edges
+      .filter(e => visibleIds.has(e.source) && visibleIds.has(e.target))
+      .map(e => ({
+        source: e.source,
+        target: e.target,
+        weight: e.weight,
+        label: e.label,
+      }))
+    return { nodes: graphNodes, links }
+  }, [graphNodes, data.edges])
+
+  const graphRef = useRef<any>(null)
+  const handleEngineStop = useCallback(() => {
+    graphRef.current?.zoomToFit(400, 24)
+  }, [])
+
+  // 5. 노드 클릭 → URL 이동
+  const handleNodeClick = useCallback((node: any) => {
+    if (node.url) window.open(node.url, '_blank', 'noreferrer')
+  }, [])
+
+  // 6. 링크 색깔 (hover 시 강조)
+  const getLinkColor = useCallback((link: any) => {
+    const srcId = typeof link.source === 'object' ? link.source.id : link.source
+    const tgtId = typeof link.target === 'object' ? link.target.id : link.target
+    const key = `${srcId}→${tgtId}`
+    return hoveredLink === key ? '#f1f5f9' : 'rgba(148,163,184,0.3)'
+  }, [hoveredLink])
+
+  const getLinkWidth = useCallback((link: any) => {
+    const srcId = typeof link.source === 'object' ? link.source.id : link.source
+    const tgtId = typeof link.target === 'object' ? link.target.id : link.target
+    const key = `${srcId}→${tgtId}`
+    return hoveredLink === key ? 2.5 : 1
+  }, [hoveredLink])
+
+  // 7. hover된 엣지 label 표시용 상태
+  const [hoveredLinkLabel, setHoveredLinkLabel] = useState<string | null>(null)
+
+  const handleLinkHover = useCallback((link: any) => {
+    if (!link) {
+      setHoveredLink(null)
+      setHoveredLinkLabel(null)
+      return
+    }
+    const srcId = typeof link.source === 'object' ? link.source.id : link.source
+    const tgtId = typeof link.target === 'object' ? link.target.id : link.target
+    setHoveredLink(`${srcId}→${tgtId}`)
+    setHoveredLinkLabel(link.label || null)
+  }, [])
+
+  return (
+    <div style={{ position: 'relative', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', background: '#f8fafc' }}>
+      {/* Legend */}
+      <div style={{ padding: '7px 14px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
+        {usedSources.map(src => {
+          const color = getSourceColor(src)
+          const hidden = hiddenSources.has(src)
+          return (
+            <button
+              key={src}
+              onClick={() => toggleSource(src)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '2px 8px', borderRadius: 4, fontSize: 11,
+                border: `1.5px solid ${color}`,
+                background: hidden ? '#fff' : color,
+                color: hidden ? color : '#fff',
+                cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s',
+              }}
+            >
+              {src}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Hover label tooltip */}
+      {hoveredLinkLabel && (
+        <div style={{
+          position: 'absolute', top: 50, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(15,23,42,0.9)', color: '#e2e8f0',
+          padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 500,
+          pointerEvents: 'none', zIndex: 20,
+          border: '1px solid rgba(255,255,255,0.1)',
+          backdropFilter: 'blur(4px)',
+        }}>
+          {hoveredLinkLabel}
+        </div>
+      )}
+
+      {/* Graph */}
+      <ForceGraph2D
+        ref={graphRef}
+        graphData={graphData}
+        width={width}
+        height={320}
+        warmupTicks={120}
+        cooldownTicks={0}
+        onEngineStop={handleEngineStop}
+        nodeId="id"
+        nodeLabel={(node: any) => `${node.title}\n${node.source}`}
+        nodeColor={(node: any) => node.color}
+        nodeRelSize={5}
+        linkColor={getLinkColor}
+        linkWidth={getLinkWidth}
+        onLinkHover={handleLinkHover}
+        onNodeClick={handleNodeClick}
+        backgroundColor="#f8fafc"
+      />
     </div>
   )
 })

@@ -73,6 +73,7 @@ export function useMockSimulation(): SimState {
     personaCount: 0,
     sourceTimeline: [],
     ontology: null,
+    graphData: null,
     isSourcing: false,
     lastRound: 0,
     backendStatus: null,

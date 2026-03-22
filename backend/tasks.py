@@ -170,7 +170,23 @@ def _build_structured_edges(nodes: list[dict], min_score: int = 2) -> list[dict]
             )
 
             if score >= min_score:
-                edges.append({"source": src["id"], "target": tgt["id"], "weight": score})
+                # label: most meaningful shared field
+                shared_ents = list(src_entities & tgt_entities)[:2]
+                if shared_ents:
+                    label = " · ".join(sorted(shared_ents)[:2])
+                else:
+                    shared_kws = list(src_kw & tgt_kw)[:2]
+                    if shared_kws:
+                        label = " · ".join(sorted(shared_kws)[:2])
+                    else:
+                        tax_overlaps = []
+                        if src.get("_domain_type") and src.get("_domain_type") == tgt.get("_domain_type"):
+                            tax_overlaps.append(src["_domain_type"])
+                        tax_overlaps += list(set(src.get("_tech_area") or []) & set(tgt.get("_tech_area") or []))
+                        tax_overlaps += list(set(src.get("_market") or []) & set(tgt.get("_market") or []))
+                        tax_overlaps += list(set(src.get("_problem_domain") or []) & set(tgt.get("_problem_domain") or []))
+                        label = " · ".join(tax_overlaps[:2])
+                edges.append({"source": src["id"], "target": tgt["id"], "weight": score, "label": label})
     return edges
 
 
@@ -212,6 +228,7 @@ Return a JSON object with exactly these fields:
         "id": item["id"],
         "title": title,
         "source": item.get("source", ""),
+        "url": item.get("url", ""),
         "abstract": data["summary"],
         "_domain_type": data["domain_type"],
         "_tech_area": data["tech_area"],
@@ -417,6 +434,22 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
 
             context_nodes = _rank_nodes_by_relevance(context_nodes, config["input_text"])
             edges = _build_structured_edges(context_nodes)
+
+            publish({
+                "type": "sim_graph",
+                "data": {
+                    "nodes": [
+                        {
+                            "id": n["id"],
+                            "title": n.get("title", ""),
+                            "source": n.get("source", ""),
+                            "url": n.get("url", ""),
+                        }
+                        for n in context_nodes
+                    ],
+                    "edges": edges,
+                },
+            })
 
             publish({
                 "type": "sim_progress",

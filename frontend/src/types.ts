@@ -120,3 +120,24 @@ export interface OntologyData {
   market_tensions: string[]
   key_trends: string[]
 }
+
+// ── Context Graph types ────────────────────────────────────────────────────────
+
+export interface ContextGraphNode {
+  id: string
+  title: string
+  source: string
+  url: string
+}
+
+export interface ContextGraphEdge {
+  source: string
+  target: string
+  weight: number
+  label: string
+}
+
+export interface ContextGraphData {
+  nodes: ContextGraphNode[]
+  edges: ContextGraphEdge[]
+}

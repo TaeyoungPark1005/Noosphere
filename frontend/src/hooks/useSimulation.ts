@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Platform, SocialPost, OntologyData } from '../types'
+import type { Platform, SocialPost, OntologyData, ContextGraphData } from '../types'
 
 export type SourceItem = { source: string; title: string; snippet: string }
 
@@ -9,6 +9,7 @@ export type SimEvent =
   | { type: 'sim_source_item'; source: string; title: string; snippet: string }
   | { type: 'sim_analysis'; data: { markdown: string } }
   | { type: 'sim_ontology'; data: OntologyData }
+  | { type: 'sim_graph'; data: ContextGraphData }
   | { type: 'sim_persona'; name: string; role: string; platform: Platform }
   | { type: 'sim_platform_post'; post: SocialPost }
   | { type: 'sim_round_summary'; round_num: number }
@@ -32,6 +33,7 @@ export interface SimState {
   personaCount: number
   sourceTimeline: SourceItem[]
   ontology: OntologyData | null
+  graphData: ContextGraphData | null
   isSourcing: boolean
   lastRound: number
   backendStatus: string | null
@@ -56,6 +58,7 @@ function createInitialState(): SimState {
     personaCount: 0,
     sourceTimeline: [],
     ontology: null,
+    graphData: null,
     isSourcing: false,
     lastRound: 0,
     backendStatus: null,
@@ -137,6 +140,8 @@ export function useSimulation(simId: string): UseSimulationResult {
             next.analysisMd = event.data.markdown
           } else if (event.type === 'sim_ontology') {
             next.ontology = event.data
+          } else if (event.type === 'sim_graph') {
+            next.graphData = event.data
           } else if (event.type === 'sim_report') {
             next.report = (event.data as Record<string, unknown>).report_json as Record<string, unknown>
             next.personas = (event.data as Record<string, unknown>).personas as Record<string, unknown>
