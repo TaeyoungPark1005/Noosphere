@@ -5,17 +5,11 @@ import { ReportView } from '../components/ReportView'
 import { DetailsView } from '../components/DetailsView'
 import { MarkdownView } from '../components/MarkdownView'
 import { SourcesView } from '../components/SourcesView'
-import { getResults } from '../api'
+import { getResults, exportPdfUrl } from '../api'
+import { VERDICT_CONFIG } from '../constants'
 import type { SimResults } from '../types'
 
 type Tab = 'analysis' | 'simulation' | 'final' | 'details'
-
-const VERDICT_CONFIG = {
-  positive: { color: '#22c55e', label: 'Positive', emoji: '✅' },
-  mixed:    { color: '#f59e0b', label: 'Mixed',    emoji: '⚖️' },
-  skeptical:{ color: '#f97316', label: 'Skeptical',emoji: '🤔' },
-  negative: { color: '#ef4444', label: 'Negative', emoji: '❌' },
-}
 
 export function ResultPage() {
   const { simId } = useParams<{ simId: string }>()
@@ -33,8 +27,6 @@ export function ResultPage() {
       .catch(e => setError(e instanceof Error ? e.message : 'Unknown error'))
       .finally(() => setLoading(false))
   }, [simId])
-
-  const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'analysis',   label: 'Analysis' },
@@ -82,7 +74,7 @@ export function ResultPage() {
                   </span>
                 </div>
                 <a
-                  href={`${API_BASE}/export/${simId}`}
+                  href={exportPdfUrl(simId!)}
                   download
                   style={{
                     display: 'inline-block', padding: '6px 14px', background: '#1e293b',
@@ -134,7 +126,7 @@ export function ResultPage() {
                 </div>
               )}
               {tab === 'simulation' && (
-                <ReportView report={results.report_json} simId={simId!} />
+                <ReportView report={results.report_json} />
               )}
               {tab === 'final' && (
                 <MarkdownView content={results.final_report_md || '_Final report not yet available._'} />

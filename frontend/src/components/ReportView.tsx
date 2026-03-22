@@ -1,17 +1,9 @@
 import type { ReportJSON } from '../types'
-
-const VERDICT_CONFIG = {
-  positive: { emoji: '✅', color: '#22c55e', label: 'Positive' },
-  mixed: { emoji: '⚖️', color: '#f59e0b', label: 'Mixed' },
-  skeptical: { emoji: '🤔', color: '#f97316', label: 'Skeptical' },
-  negative: { emoji: '❌', color: '#ef4444', label: 'Negative' },
-}
+import { VERDICT_CONFIG } from '../constants'
 
 const SENTIMENT_ICONS: Record<string, string> = { positive: '👍', neutral: '😐', negative: '👎' }
 
-export function ReportView({ report, simId }: { report: ReportJSON | null | undefined; simId: string }) {
-  const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
-
+export function ReportView({ report }: { report: ReportJSON | null | undefined }) {
   if (!report || !report.verdict) {
     return (
       <div style={{ padding: 48, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>

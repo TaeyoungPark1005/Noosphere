@@ -1,7 +1,15 @@
 // frontend/src/components/OntologyGraph.tsx
 import { useState, useCallback, useMemo, memo, useRef, useEffect } from 'react'
-import ForceGraph2D from 'react-force-graph-2d'
-import type { OntologyEntity, OntologyRelationship, OntologyData, ContextGraphData } from '../types'
+import ForceGraph2D, { type ForceGraphMethods, type LinkObject, type NodeObject } from 'react-force-graph-2d'
+import type {
+  OntologyEntity,
+  OntologyRelationship,
+  OntologyData,
+  ContextGraphData,
+  ContextGraphNode as ContextGraphDataNode,
+  ContextGraphEdge as ContextGraphDataEdge,
+} from '../types'
+import { SOURCE_COLORS } from '../constants'
 
 const NODE_COLORS: Record<string, string> = {
   framework:      '#3b82f6',
@@ -51,11 +59,59 @@ interface GraphNode {
   color: string
 }
 
-interface GraphLink {
-  source: string
-  target: string
+interface GraphLinkData {
   type: string
   color: string
+  from: string
+  to: string
+}
+
+type GraphLink = LinkObject<GraphNode, GraphLinkData>
+
+type ContextRenderNode = ContextGraphDataNode & { color: string }
+type ContextRenderLinkData = Omit<ContextGraphDataEdge, 'source' | 'target'>
+type ContextRenderLink = LinkObject<ContextRenderNode, ContextRenderLinkData>
+
+type OntologyGraphHandle = ForceGraphMethods<NodeObject<GraphNode>, LinkObject<GraphNode, GraphLinkData>>
+type ContextGraphHandle = ForceGraphMethods<NodeObject<ContextRenderNode>, LinkObject<ContextRenderNode, ContextRenderLinkData>>
+
+const EMPTY_NODE_IDS: string[] = []
+
+function hasStringProp(value: unknown, key: string): value is Record<string, string> {
+  return typeof value === 'object' && value !== null && typeof (value as Record<string, unknown>)[key] === 'string'
+}
+
+function isGraphNode(node: unknown): node is GraphNode {
+  return hasStringProp(node, 'id') && hasStringProp(node, 'name') && hasStringProp(node, 'type')
+}
+
+function isContextRenderNode(node: unknown): node is ContextRenderNode {
+  return hasStringProp(node, 'id') && hasStringProp(node, 'title') && hasStringProp(node, 'source')
+}
+
+function isGraphLink(link: unknown): link is GraphLink {
+  return (
+    typeof link === 'object' &&
+    link !== null &&
+    'source' in link &&
+    'target' in link &&
+    hasStringProp(link, 'type')
+  )
+}
+
+function isContextRenderLink(link: unknown): link is ContextRenderLink {
+  return (
+    typeof link === 'object' &&
+    link !== null &&
+    'source' in link &&
+    'target' in link &&
+    hasStringProp(link, 'label')
+  )
+}
+
+function getEndpointId(endpoint: string | number | { id?: string | number } | undefined): string {
+  if (endpoint === undefined) return ''
+  return typeof endpoint === 'object' ? String(endpoint.id ?? '') : String(endpoint)
 }
 
 // ── Side panel ────────────────────────────────────────────────────────────────
@@ -69,16 +125,30 @@ interface SidePanelProps {
 }
 
 function SidePanel({ entity, entities, relationships, contextNodes, onClose }: SidePanelProps) {
+  const entityId = entity?.id ?? null
+  const sourceNodeIds = entity?.source_node_ids ?? EMPTY_NODE_IDS
+
   const entityMap = useMemo(
     () => Object.fromEntries(entities.map(e => [e.id, e])),
     [entities]
   )
 
-  if (!entity) return null
+  const outgoing = useMemo(
+    () => entityId ? relationships.filter(r => r.from === entityId) : [],
+    [relationships, entityId]
+  )
+  const incoming = useMemo(
+    () => entityId ? relationships.filter(r => r.to === entityId) : [],
+    [relationships, entityId]
+  )
+  const sources = useMemo(
+    () => sourceNodeIds.length > 0
+      ? contextNodes.filter(n => sourceNodeIds.includes(n.id))
+      : [],
+    [contextNodes, sourceNodeIds]
+  )
 
-  const outgoing = relationships.filter(r => r.from === entity.id)
-  const incoming = relationships.filter(r => r.to === entity.id)
-  const sources = contextNodes.filter(n => entity.source_node_ids.includes(n.id))
+  if (!entity) return null
   const totalConnections = outgoing.length + incoming.length
 
   return (
@@ -214,13 +284,12 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
     autoSelectId ? (data.entities.find(e => e.id === autoSelectId) ?? null) : null
   )
   const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set())
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const graphRef = useRef<any>(null)
+  const graphRef = useRef<OntologyGraphHandle | undefined>(undefined)
 
   useEffect(() => {
-    if (autoSelectId) {
-      setSelectedEntity(data.entities.find(e => e.id === autoSelectId) ?? null)
-    }
+    setSelectedEntity(
+      autoSelectId ? (data.entities.find(e => e.id === autoSelectId) ?? null) : null
+    )
   }, [autoSelectId, data.entities])
 
   const handleEngineStop = useCallback(() => {
@@ -241,6 +310,8 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
       .map(r => ({
         source: r.from,
         target: r.to,
+        from: r.from,
+        to: r.to,
         type: r.type,
         color: EDGE_COLORS[r.type] ?? '#cbd5e1',
       }))
@@ -276,8 +347,8 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
 
   const getLinkColor = useCallback((link: GraphLink) => {
     if (!highlightSet) return link.color
-    const srcId = typeof link.source === 'object' ? (link.source as GraphNode).id : link.source
-    const tgtId = typeof link.target === 'object' ? (link.target as GraphNode).id : link.target
+    const srcId = getEndpointId(link.source)
+    const tgtId = getEndpointId(link.target)
     return highlightSet.links.has(`${srcId}→${tgtId}`) ? link.color : link.color + '25'
   }, [highlightSet])
 
@@ -311,7 +382,7 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
 
       {/* Graph */}
       <div style={{ position: 'relative', height: 300 }}>
-        <ForceGraph2D
+        <ForceGraph2D<GraphNode, GraphLinkData>
           ref={graphRef}
           graphData={graphData}
           width={width}
@@ -320,20 +391,17 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
           cooldownTicks={0}
           onEngineStop={handleEngineStop}
           nodeId="id"
-          // @ts-expect-error ForceGraph2D generic node type mismatch
-          nodeLabel={(node: GraphNode) => `${node.name} · ${node.type}`}
-          // @ts-expect-error ForceGraph2D generic node type mismatch
-          nodeColor={getNodeColor}
+          nodeLabel={(node: unknown) => isGraphNode(node) ? `${node.name} · ${node.type}` : ''}
+          nodeColor={(node: unknown) => isGraphNode(node) ? getNodeColor(node) : '#94a3b8'}
           nodeRelSize={6}
-          linkColor={getLinkColor}
+          linkColor={(link: unknown) => isGraphLink(link) ? getLinkColor(link) : '#cbd5e1'}
           linkDirectionalArrowLength={6}
           linkDirectionalArrowRelPos={1}
-          // @ts-expect-error linkLineDash not in typings but supported at runtime
-          linkLineDash={(link: GraphLink) => EDGE_DASHED[link.type] ? [4, 2] : undefined}
+          linkLineDash={(link: unknown) => isGraphLink(link) && EDGE_DASHED[link.type] ? [4, 2] : null}
           onNodeClick={(node: unknown) => {
-            const n = node as GraphNode
-            const entity = data.entities.find(e => e.id === n.id)
-            setSelectedEntity(prev => prev?.id === n.id ? null : (entity ?? null))
+            if (!isGraphNode(node)) return
+            const entity = data.entities.find(e => e.id === node.id)
+            setSelectedEntity(prev => prev?.id === node.id ? null : (entity ?? null))
           }}
           backgroundColor="#f8fafc"
         />
@@ -352,17 +420,6 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
 })
 
 // ── ContextGraph ───────────────────────────────────────────────────────────────
-
-const SOURCE_COLORS: Record<string, string> = {
-  arxiv:        '#a855f7',
-  s2:           '#6366f1',
-  hackernews:   '#f97316',
-  reddit:       '#ef4444',
-  github:       '#22c55e',
-  product_hunt: '#ec4899',
-  gdelt:        '#eab308',
-  input_text:   '#64748b',
-}
 
 function getSourceColor(source: string): string {
   for (const [key, color] of Object.entries(SOURCE_COLORS)) {
@@ -409,38 +466,37 @@ export const ContextGraph = memo(function ContextGraph({ data, width }: ContextG
 
   const graphData = useMemo(() => {
     const visibleIds = new Set(graphNodes.map(n => n.id))
-    const links = data.edges
+    const links: ContextRenderLink[] = data.edges
       .filter(e => visibleIds.has(e.source) && visibleIds.has(e.target))
       .map(e => ({
+        ...e,
         source: e.source,
         target: e.target,
-        weight: e.weight,
-        label: e.label,
       }))
     return { nodes: graphNodes, links }
   }, [graphNodes, data.edges])
 
-  const graphRef = useRef<any>(null)
+  const graphRef = useRef<ContextGraphHandle | undefined>(undefined)
   const handleEngineStop = useCallback(() => {
     graphRef.current?.zoomToFit(400, 24)
   }, [])
 
   // 5. 노드 클릭 → URL 이동
-  const handleNodeClick = useCallback((node: any) => {
+  const handleNodeClick = useCallback((node: ContextRenderNode) => {
     if (node.url) window.open(node.url, '_blank', 'noreferrer')
   }, [])
 
   // 6. 링크 색깔 (hover 시 강조)
-  const getLinkColor = useCallback((link: any) => {
-    const srcId = typeof link.source === 'object' ? link.source.id : link.source
-    const tgtId = typeof link.target === 'object' ? link.target.id : link.target
+  const getLinkColor = useCallback((link: ContextRenderLink) => {
+    const srcId = getEndpointId(link.source)
+    const tgtId = getEndpointId(link.target)
     const key = `${srcId}→${tgtId}`
     return hoveredLink === key ? '#f1f5f9' : 'rgba(148,163,184,0.3)'
   }, [hoveredLink])
 
-  const getLinkWidth = useCallback((link: any) => {
-    const srcId = typeof link.source === 'object' ? link.source.id : link.source
-    const tgtId = typeof link.target === 'object' ? link.target.id : link.target
+  const getLinkWidth = useCallback((link: ContextRenderLink) => {
+    const srcId = getEndpointId(link.source)
+    const tgtId = getEndpointId(link.target)
     const key = `${srcId}→${tgtId}`
     return hoveredLink === key ? 2.5 : 1
   }, [hoveredLink])
@@ -448,16 +504,16 @@ export const ContextGraph = memo(function ContextGraph({ data, width }: ContextG
   // 7. hover된 엣지 label 표시용 상태
   const [hoveredLinkLabel, setHoveredLinkLabel] = useState<string | null>(null)
 
-  const handleLinkHover = useCallback((link: any) => {
+  const handleLinkHover = useCallback((link: ContextRenderLink | null) => {
     if (!link) {
       setHoveredLink(null)
       setHoveredLinkLabel(null)
       return
     }
-    const srcId = typeof link.source === 'object' ? link.source.id : link.source
-    const tgtId = typeof link.target === 'object' ? link.target.id : link.target
+    const srcId = getEndpointId(link.source)
+    const tgtId = getEndpointId(link.target)
     setHoveredLink(`${srcId}→${tgtId}`)
-    setHoveredLinkLabel(link.label || null)
+    setHoveredLinkLabel(link.label)
   }, [])
 
   return (
@@ -501,7 +557,7 @@ export const ContextGraph = memo(function ContextGraph({ data, width }: ContextG
       )}
 
       {/* Graph */}
-      <ForceGraph2D
+      <ForceGraph2D<ContextRenderNode, ContextRenderLinkData>
         ref={graphRef}
         graphData={graphData}
         width={width}
@@ -510,13 +566,15 @@ export const ContextGraph = memo(function ContextGraph({ data, width }: ContextG
         cooldownTicks={0}
         onEngineStop={handleEngineStop}
         nodeId="id"
-        nodeLabel={(node: any) => `${node.title}\n${node.source}`}
-        nodeColor={(node: any) => node.color}
+        nodeLabel={(node: unknown) => isContextRenderNode(node) ? `${node.title}\n${node.source}` : ''}
+        nodeColor={(node: unknown) => isContextRenderNode(node) ? node.color : '#94a3b8'}
         nodeRelSize={5}
-        linkColor={getLinkColor}
-        linkWidth={getLinkWidth}
-        onLinkHover={handleLinkHover}
-        onNodeClick={handleNodeClick}
+        linkColor={(link: unknown) => isContextRenderLink(link) ? getLinkColor(link) : 'rgba(148,163,184,0.3)'}
+        linkWidth={(link: unknown) => isContextRenderLink(link) ? getLinkWidth(link) : 1}
+        onLinkHover={(link: unknown) => handleLinkHover(isContextRenderLink(link) ? link : null)}
+        onNodeClick={(node: unknown) => {
+          if (isContextRenderNode(node)) handleNodeClick(node)
+        }}
         backgroundColor="#f8fafc"
       />
     </div>

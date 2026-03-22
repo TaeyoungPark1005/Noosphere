@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '../components/Header'
 import { startSimulation } from '../api'
+import { PLATFORM_OPTIONS } from '../constants'
 import type { Platform, Provider, SimConfig } from '../types'
 
 const PROVIDER_OPTIONS: Array<{ id: Provider; label: string; description: string }> = [
@@ -10,13 +11,6 @@ const PROVIDER_OPTIONS: Array<{ id: Provider; label: string; description: string
   { id: 'gemini',    label: 'Gemini', description: 'Google Gemini' },
 ]
 
-const PLATFORM_OPTIONS: Array<{ id: Platform; label: string; icon: string }> = [
-  { id: 'hackernews',      label: 'Hacker News',       icon: '🟠' },
-  { id: 'producthunt',     label: 'Product Hunt',       icon: '🔴' },
-  { id: 'indiehackers',   label: 'Indie Hackers',      icon: '🟣' },
-  { id: 'reddit_startups', label: 'Reddit r/startups',  icon: '🟤' },
-  { id: 'linkedin',        label: 'LinkedIn',            icon: '🔵' },
-]
 
 const LANGUAGE_OPTIONS = [
   { value: 'English',    label: 'English' },

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MOCK_SOURCES, MOCK_PERSONAS, MOCK_POSTS } from '../hooks/useMockSimulation'
-import { SOURCE_COLORS } from '../constants'
+import { SOURCE_COLORS, PLATFORM_COLORS, PLATFORM_OPTIONS } from '../constants'
 import { ReportView } from './ReportView'
 import { MarkdownView } from './MarkdownView'
 import { PlatformSimFeed } from './PlatformSimFeed'
@@ -37,15 +37,6 @@ const MOCK_GRAPH_DATA: ContextGraphData = {
     { source: 's7', target: 's10', weight: 4, label: 'product launch · community' },
   ],
 }
-
-const PLATFORM_COLORS: Record<Platform, string> = {
-  hackernews:      '#f97316',
-  producthunt:     '#ef4444',
-  indiehackers:    '#8b5cf6',
-  reddit_startups: '#b45309',
-  linkedin:        '#2563eb',
-}
-
 
 // ── Mock results (extracted from DemoPage) ───────────────────────────────────
 
@@ -232,6 +223,7 @@ Across all five simulated platforms, the overall reception was **cautiously opti
     ],
   },
   report_md: '',
+  context_nodes_json: MOCK_GRAPH_DATA.nodes,
   sources_json: [
     { id: 's1', source: 'github',           title: 'microsoft/autogen — Multi-Agent Framework',                          score: 0.91, url: 'https://github.com/microsoft/autogen',     date: '2024-11' },
     { id: 's2', source: 'arxiv',            title: 'LLM-based Multi-Agent Systems for Social Simulation',                score: 0.88, url: 'https://arxiv.org/abs/2312.01234',          date: '2024-09' },
@@ -280,14 +272,6 @@ Paste your landing page, pitch deck, or product description and Noosphere will:
 - Generate 50+ AI personas representing your target audience
 - Run multi-round social simulations across 5 tech platforms
 - Deliver a structured analysis: verdict, sentiment by segment, key criticisms`
-
-const PLATFORM_OPTIONS: Array<{ id: Platform; label: string; icon: string }> = [
-  { id: 'hackernews',      label: 'Hacker News',      icon: '🟠' },
-  { id: 'producthunt',     label: 'Product Hunt',     icon: '🔴' },
-  { id: 'indiehackers',   label: 'Indie Hackers',    icon: '🟣' },
-  { id: 'reddit_startups', label: 'Reddit r/startups', icon: '🟤' },
-  { id: 'linkedin',        label: 'LinkedIn',          icon: '🔵' },
-]
 
 type Phase = 'home' | 'simulate' | 'results'
 type ResultTab = 'analysis' | 'simulation' | 'final' | 'details'
@@ -445,13 +429,13 @@ function SimulatePhase({
               <div key={i} className="source-item" style={{
                 padding: '8px 12px', borderRadius: 8,
                 background: '#fff', border: '1px solid #e2e8f0',
-                borderLeft: `3px solid ${SOURCE_COLORS[src.source as keyof typeof SOURCE_COLORS] || '#94a3b8'}`,
+                borderLeft: `3px solid ${SOURCE_COLORS[src.source] || '#94a3b8'}`,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                   <span style={{
                     fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 8,
-                    background: `${SOURCE_COLORS[src.source as keyof typeof SOURCE_COLORS] || '#94a3b8'}18`,
-                    color: SOURCE_COLORS[src.source as keyof typeof SOURCE_COLORS] || '#64748b',
+                    background: `${SOURCE_COLORS[src.source] || '#94a3b8'}18`,
+                    color: SOURCE_COLORS[src.source] || '#64748b',
                     textTransform: 'uppercase', letterSpacing: '0.04em',
                   }}>
                     {src.source}
@@ -584,7 +568,7 @@ function ResultsPhase({ tab, detailTab }: { tab: ResultTab; detailTab: 'feed' | 
           </div>
         )}
         {tab === 'simulation' && (
-          <ReportView report={MOCK_RESULTS.report_json} simId="demo" />
+          <ReportView report={MOCK_RESULTS.report_json} />
         )}
         {tab === 'final' && (
           <MarkdownView content={MOCK_RESULTS.final_report_md} />

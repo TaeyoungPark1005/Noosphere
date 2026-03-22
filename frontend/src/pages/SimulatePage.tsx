@@ -1,20 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Header } from '../components/Header'
 import { useSimulation } from '../hooks/useSimulation'
 import { PlatformSimFeed } from '../components/PlatformSimFeed'
 import { ContextGraph } from '../components/OntologyGraph'
-import { SOURCE_COLORS } from '../constants'
+import { SOURCE_COLORS, PLATFORM_COLORS } from '../constants'
 import { resumeSimulation } from '../api'
 import type { Platform, SocialPost } from '../types'
-
-const PLATFORM_COLORS: Record<Platform, string> = {
-  hackernews: '#f97316',
-  producthunt: '#ef4444',
-  indiehackers: '#8b5cf6',
-  reddit_startups: '#b45309',
-  linkedin: '#2563eb',
-}
 
 export function SimulatePage() {
   const { simId } = useParams<{ simId: string }>()
@@ -43,10 +35,13 @@ export function SimulatePage() {
     }
   }, [sim.status, simId, navigate])
 
-  const lastProgress = sim.events
-    .filter(e => e.type === 'sim_progress')
-    .map(e => (e as { type: 'sim_progress'; message: string }).message)
-    .at(-1)
+  const lastProgress = useMemo(() => {
+    for (let index = sim.events.length - 1; index >= 0; index -= 1) {
+      const event = sim.events[index]
+      if (event.type === 'sim_progress') return event.message
+    }
+    return undefined
+  }, [sim.events])
 
   const totalPosts = Object.values(sim.postsByPlatform).reduce((s, a) => s + (a?.length ?? 0), 0)
 
