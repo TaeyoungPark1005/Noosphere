@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import type { Platform, SocialPost, Persona } from '../types'
 import { PlatformSimFeed } from './PlatformSimFeed'
 import { PersonaCardView } from './PersonaCardView'
@@ -15,20 +15,44 @@ export function DetailsView({ posts, personas, forcedTab }: Props) {
   const [tab, setTab] = useState<DetailTab>('feed')
   const activeTab = forcedTab ?? tab
 
+  // Sync internal tab state when forcedTab changes externally
+  useEffect(() => {
+    if (forcedTab && forcedTab !== tab) setTab(forcedTab)
+  }, [forcedTab, tab])
+
   // Extract sorted unique round numbers from all posts
-  const allPosts = Object.values(posts).flat() as SocialPost[]
-  const rounds = [...new Set(allPosts.map(p => p.round_num))].sort((a, b) => a - b)
+  const allPosts = useMemo(() => Object.values(posts).flat() as SocialPost[], [posts])
+  const rounds = useMemo(
+    () => [...new Set(allPosts.map(p => p.round_num))].sort((a, b) => a - b),
+    [allPosts]
+  )
   const [activeRound, setActiveRound] = useState<number | null>(rounds[0] ?? null)
+  const prevRoundsLengthRef = useRef(rounds.length)
+
+  useEffect(() => {
+    const hadRounds = prevRoundsLengthRef.current > 0
+    setActiveRound(prev => {
+      if (rounds.length === 0) return null
+      if (!hadRounds) return rounds[0] ?? null
+      if (prev === null || rounds.includes(prev)) return prev
+      return rounds[0] ?? null
+    })
+    prevRoundsLengthRef.current = rounds.length
+  }, [rounds])
 
   // Filter posts to active round (null = show all)
-  const filteredPosts: Partial<Record<Platform, SocialPost[]>> = activeRound === null
-    ? posts
-    : Object.fromEntries(
-        Object.entries(posts).map(([platform, platformPosts]) => [
-          platform,
-          (platformPosts ?? []).filter(p => p.round_num === activeRound),
-        ])
-      ) as Partial<Record<Platform, SocialPost[]>>
+  const filteredPosts = useMemo<Partial<Record<Platform, SocialPost[]>>>(
+    () =>
+      activeRound === null
+        ? posts
+        : (Object.fromEntries(
+            Object.entries(posts).map(([platform, platformPosts]) => [
+              platform,
+              (platformPosts ?? []).filter(p => p.round_num === activeRound),
+            ])
+          ) as Partial<Record<Platform, SocialPost[]>>),
+    [posts, activeRound]
+  )
 
   const tabs: { id: DetailTab; label: string }[] = [
     { id: 'feed', label: 'Social Feed' },

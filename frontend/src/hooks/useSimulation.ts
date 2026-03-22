@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { API_BASE } from '../api'
 import type { Platform, SocialPost, ContextGraphData, ContextGraphNode, ContextGraphEdge } from '../types'
 
 export type SourceItem = { source: string; title: string; snippet: string }
@@ -76,15 +77,20 @@ export function useSimulation(simId: string): UseSimulationResult {
 
   useEffect(() => {
     if (!simId) return
-    const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
     const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000, 30000]
     const MAX_RETRIES = RECONNECT_DELAYS.length
     let retryCount = 0
     let stopped = false
     let currentEs: EventSource | null = null
+    let reconnectTimer: number | null = null
 
     function connect() {
       if (stopped) return
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
+
       const lastId = lastEventIdRef.current
       const url = lastId !== '0'
         ? `${API_BASE}/simulate-stream/${simId}?last_id=${encodeURIComponent(lastId)}`
@@ -93,6 +99,8 @@ export function useSimulation(simId: string): UseSimulationResult {
       currentEs = es
 
       es.onmessage = (e) => {
+        if (currentEs !== es) return
+
         let event: SimEvent
         try {
           event = JSON.parse(e.data) as SimEvent
@@ -161,14 +169,25 @@ export function useSimulation(simId: string): UseSimulationResult {
             next.errorMsg = event.message
           } else if (event.type === 'sim_done') {
             if (prev.status !== 'error') next.status = 'done'
-            stopped = true
-            es.close()
           }
           return next
         })
+
+        if (event.type === 'sim_done') {
+          stopped = true
+          if (reconnectTimer !== null) {
+            window.clearTimeout(reconnectTimer)
+            reconnectTimer = null
+          }
+          if (currentEs === es) currentEs = null
+          es.close()
+        }
       }
 
       es.onerror = () => {
+        if (currentEs !== es) return
+
+        currentEs = null
         es.close()
         if (stopped) return
         if (retryCount >= MAX_RETRIES) {
@@ -177,26 +196,37 @@ export function useSimulation(simId: string): UseSimulationResult {
         }
         const delay = RECONNECT_DELAYS[retryCount]
         retryCount++
-        window.setTimeout(connect, delay)
+        reconnectTimer = window.setTimeout(() => {
+          reconnectTimer = null
+          connect()
+        }, delay)
       }
     }
 
     connect()
     return () => {
       stopped = true
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
       currentEs?.close()
+      currentEs = null
     }
   }, [simId, connectionKey])
 
   useEffect(() => {
     if (state.status !== 'error' || !simId) return
-    const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
     let cancelled = false
     let retryTimer: number | null = null
+    const controller = new AbortController()
 
     const checkStatus = () => {
-      fetch(`${API_BASE}/simulate/${simId}/status`)
-        .then(r => r.ok ? r.json() : null)
+      if (cancelled || controller.signal.aborted) return
+
+      fetch(`${API_BASE}/simulate/${simId}/status`, { signal: controller.signal })
+        .then(async r => {
+          if (r.ok) return r.json()
+          if (r.status === 404) return null
+          throw new Error(`Status check failed: ${r.status}`)
+        })
         .then(data => {
           if (cancelled || !data) return
           setState(prev => ({
@@ -207,16 +237,27 @@ export function useSimulation(simId: string): UseSimulationResult {
             canResume: data.status === 'failed' && (data.last_round ?? 0) > 0,
           }))
           if (!cancelled && data.status === 'running') {
-            retryTimer = window.setTimeout(checkStatus, 1500)
+            retryTimer = window.setTimeout(() => {
+              retryTimer = null
+              checkStatus()
+            }, 1500)
           }
         })
-        .catch(() => {})
+        .catch(error => {
+          if (cancelled || controller.signal.aborted) return
+          if (error instanceof DOMException && error.name === 'AbortError') return
+          retryTimer = window.setTimeout(() => {
+            retryTimer = null
+            checkStatus()
+          }, 1500)
+        })
     }
 
     checkStatus()
     return () => {
       cancelled = true
       if (retryTimer !== null) window.clearTimeout(retryTimer)
+      controller.abort()
     }
   }, [state.status, simId])
 
