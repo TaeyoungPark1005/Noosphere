@@ -1,6 +1,6 @@
-# Noosphere
-
 <div align="center">
+
+<img src="./assets/banner.svg" alt="Noosphere" width="100%"/>
 
 **[English](./README.md)** · [한국어](./i18n/README.ko.md) · [日本語](./i18n/README.ja.md) · [中文（简体）](./i18n/README.zh-CN.md) · [中文（繁體）](./i18n/README.zh-TW.md) · [Español](./i18n/README.es.md) · [Français](./i18n/README.fr.md) · [Deutsch](./i18n/README.de.md) · [Português](./i18n/README.pt.md)
 

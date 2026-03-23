@@ -1,4 +1,8 @@
-# Noosphere
+<div align="center">
+
+<img src="../assets/banner.svg" alt="Noosphere" width="100%"/>
+
+</div>
 
 <div align="center">
 
