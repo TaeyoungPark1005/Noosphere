@@ -199,7 +199,44 @@ def _build_structured_edges(nodes: list[dict], min_score: int = 8) -> list[dict]
     return edges
 
 
-def _calc_edges_for_node(new_node: dict, existing_nodes: list[dict], min_score: int = 2) -> list[dict]:
+def _top_k_edges(edges: list[dict], k: int = 3) -> list[dict]:
+    """노드당 엣지 선별.
+    - 최고 점수 그룹은 전부 포함 (k 초과 허용)
+    - 이후 그룹은 남은 슬롯(k - 최고그룹수)을 채울 때까지 추가
+    - 양쪽 노드 중 어느 한쪽이라도 거부하면 제거
+    예) 10점×5, 9점×10 → 10점 5개 전부 (9점은 A 노드가 거부)
+        10점×1, 9점×1, 8점×2 → 10점 1개 + 9점 1개 + 8점 1개 = 3개
+    """
+    from collections import defaultdict
+    from itertools import groupby
+
+    node_edges: dict[str, list[dict]] = defaultdict(list)
+    for e in edges:
+        node_edges[e["source"]].append(e)
+        node_edges[e["target"]].append(e)
+
+    rejected: set[int] = set()
+    for node_edge_list in node_edges.values():
+        sorted_edges = sorted(node_edge_list, key=lambda x: x["weight"], reverse=True)
+        remaining = k
+        first = True
+        for _, group in groupby(sorted_edges, key=lambda x: x["weight"]):
+            group_list = list(group)
+            if first:
+                remaining = max(0, k - len(group_list))
+                first = False
+            else:
+                if remaining <= 0 or len(group_list) > remaining:
+                    # 슬롯 부족 시 그룹 전체 버림 (반만 추가하지 않음)
+                    for e in group_list:
+                        rejected.add(id(e))
+                else:
+                    remaining -= len(group_list)
+
+    return [e for e in edges if id(e) not in rejected]
+
+
+def _calc_edges_for_node(new_node: dict, existing_nodes: list[dict], min_score: int = 8) -> list[dict]:
     """새 노드 1개와 기존 노드 목록 간의 엣지만 계산한다."""
     if not new_node.get("id"):
         return []
@@ -454,11 +491,14 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
         watcher_task: asyncio.Task | None = None
         heartbeat_task: asyncio.Task | None = None
         analysis_md = ""
+        raw_items: list = []
         posts_by_platform: dict = {}
         personas_by_platform: dict = {}
         report_json: dict = {}
         report_md: str = ""
         final_report_md: str = ""
+        gtm_md: str = ""
+        _sim_done_published = False
 
         try:
             if not await asyncio.to_thread(mark_simulation_started, DB_PATH, sim_id):
@@ -498,7 +538,7 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                             "url": _node.get("url", ""),
                         },
                     })
-                    _new_edges = _calc_edges_for_node(_node, _restored_so_far)
+                    _new_edges = _top_k_edges(_calc_edges_for_node(_node, _restored_so_far))
                     if _new_edges:
                         publish({"type": "sim_graph_edges", "edges": _new_edges})
                     _restored_so_far.append(_node)
@@ -542,7 +582,7 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                             "url": node.get("url", ""),
                         },
                     })
-                    new_edges = _calc_edges_for_node(node, existing)
+                    new_edges = _top_k_edges(_calc_edges_for_node(node, existing))
                     if new_edges:
                         publish({"type": "sim_graph_edges", "edges": new_edges})
                     return node
@@ -599,7 +639,7 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                 publish({"type": "sim_analysis", "data": {"markdown": analysis_md}})
 
             context_nodes = _rank_nodes_by_relevance(context_nodes, config["input_text"])
-            edges = _build_structured_edges(context_nodes)
+            edges = _top_k_edges(_build_structured_edges(context_nodes))
 
             _idea_node = next((n for n in context_nodes if n.get("id") == "idea"), None)
             idea_summary = _idea_node["abstract"] if _idea_node else config["input_text"]
@@ -650,6 +690,20 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                 publish(event)
 
             await checkpoint()
+            publish({"type": "sim_progress", "message": "Generating launch strategy..."})
+            try:
+                from backend.reporter import generate_gtm_report
+                gtm_md = await generate_gtm_report(
+                    report_json=report_json,
+                    analysis_md=analysis_md,
+                    input_text=idea_summary,
+                    language=config["language"],
+                    provider=provider,
+                )
+                publish({"type": "sim_gtm_report", "data": {"markdown": gtm_md}})
+            except Exception as _e:
+                logger.warning("GTM report generation failed: %s", _e)
+                gtm_md = "## Launch Strategy\n\n_Generation failed._"
             publish({"type": "sim_progress", "message": "Generating final report..."})
             try:
                 final_report_md = await generate_final_report(
@@ -658,6 +712,7 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                     input_text=idea_summary,
                     language=config["language"],
                     provider=provider,
+                    gtm_md=gtm_md,
                 )
                 publish({"type": "sim_final_report", "data": {"markdown": final_report_md}})
             except Exception as _e:
@@ -674,6 +729,7 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                 raw_items=raw_items,
                 final_report_md=final_report_md,
                 context_nodes=context_nodes,
+                gtm_md=gtm_md,
             )
             completed = await asyncio.to_thread(
                 update_simulation_status,
@@ -692,6 +748,7 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                 )
             # DB 저장 완료 후 sim_done 발행 → 프론트가 이 시점에 navigate
             publish({"type": "sim_done"})
+            _sim_done_published = True
         except asyncio.CancelledError:
             logger.info("Simulation %s cancelled", sim_id)
             publish({"type": "sim_error", "message": USER_CANCEL_MESSAGE})
@@ -724,7 +781,8 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
             for sig in installed_signal_handlers:
                 with contextlib.suppress(Exception):
                     loop.remove_signal_handler(sig)
-            publish({"type": "sim_done"})
+            if not _sim_done_published:
+                publish({"type": "sim_done"})
             r.expire(stream_key, STREAM_TTL)
 
     try:

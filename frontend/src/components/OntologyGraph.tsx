@@ -499,7 +499,16 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
     const fg = graphRef.current
     if (!fg) return
     fg.d3Force('charge')?.strength(-400)
-    fg.d3Force('link')?.distance(120)
+    // weight는 정수 8~30+ 범위. 높을수록 가깝게(60px), 낮을수록 멀게(200px)
+    fg.d3Force('link')?.distance((link: ContextRenderLink) => {
+      const w = (link as unknown as { weight?: number }).weight ?? 8
+      const t = Math.min(Math.max((w - 8) / 22, 0), 1) // 8→0, 30→1
+      return 200 - t * 140 // 200px ~ 60px
+    })
+    // 노드 겹침 방지 (반지름 50px 이내 침범 금지)
+    import('d3-force-3d').then(({ forceCollide }) => {
+      fg.d3Force('collide', forceCollide(50))
+    })
   }, [])
 
   const handleEngineStop = useCallback(() => {
