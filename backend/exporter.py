@@ -173,6 +173,8 @@ _LANG_SETTINGS: dict[str, tuple[str, str, dict[str, str]]] = {
             "no_simulation": "_시뮬레이션 보고서 없음_",
             "section_final_report": "최종 보고서",
             "no_final_report": "_최종 보고서 없음_",
+            "section_gtm": "런치 전략",
+            "no_gtm": "_런치 전략 없음_",
         },
     ),
     "Japanese": (
@@ -193,6 +195,8 @@ _LANG_SETTINGS: dict[str, tuple[str, str, dict[str, str]]] = {
             "no_simulation": "_シミュレーションレポートなし_",
             "section_final_report": "最終レポート",
             "no_final_report": "_最終レポートなし_",
+            "section_gtm": "ローンチ戦略",
+            "no_gtm": "_ローンチ戦略なし_",
         },
     ),
     "Chinese": (
@@ -213,6 +217,8 @@ _LANG_SETTINGS: dict[str, tuple[str, str, dict[str, str]]] = {
             "no_simulation": "_无模拟报告_",
             "section_final_report": "最终报告",
             "no_final_report": "_无最终报告_",
+            "section_gtm": "上市策略",
+            "no_gtm": "_无上市策略_",
         },
     ),
     "Spanish": (
@@ -233,6 +239,8 @@ _LANG_SETTINGS: dict[str, tuple[str, str, dict[str, str]]] = {
             "no_simulation": "_Sin informe de simulación_",
             "section_final_report": "Informe Final",
             "no_final_report": "_Sin informe final_",
+            "section_gtm": "Estrategia de Lanzamiento",
+            "no_gtm": "_Sin estrategia de lanzamiento_",
         },
     ),
     "French": (
@@ -253,6 +261,8 @@ _LANG_SETTINGS: dict[str, tuple[str, str, dict[str, str]]] = {
             "no_simulation": "_Aucun rapport de simulation_",
             "section_final_report": "Rapport Final",
             "no_final_report": "_Aucun rapport final_",
+            "section_gtm": "Stratégie de Lancement",
+            "no_gtm": "_Aucune stratégie de lancement_",
         },
     ),
     "German": (
@@ -273,6 +283,8 @@ _LANG_SETTINGS: dict[str, tuple[str, str, dict[str, str]]] = {
             "no_simulation": "_Kein Simulationsbericht_",
             "section_final_report": "Abschlussbericht",
             "no_final_report": "_Kein Abschlussbericht_",
+            "section_gtm": "Launch-Strategie",
+            "no_gtm": "_Keine Launch-Strategie_",
         },
     ),
     "Portuguese": (
@@ -293,6 +305,8 @@ _LANG_SETTINGS: dict[str, tuple[str, str, dict[str, str]]] = {
             "no_simulation": "_Sem relatório de simulação_",
             "section_final_report": "Relatório Final",
             "no_final_report": "_Sem relatório final_",
+            "section_gtm": "Estratégia de Lançamento",
+            "no_gtm": "_Sem estratégia de lançamento_",
         },
     ),
     "English": (
@@ -313,6 +327,8 @@ _LANG_SETTINGS: dict[str, tuple[str, str, dict[str, str]]] = {
             "no_simulation": "_No simulation report_",
             "section_final_report": "Final Report",
             "no_final_report": "_No final report_",
+            "section_gtm": "Launch Strategy",
+            "no_gtm": "_No launch strategy available_",
         },
     ),
 }
@@ -327,6 +343,7 @@ def _build_typst(
     sim_params: dict | None = None,
     final_report_md: str | None = None,
     idea_title: str = "",
+    gtm_md: str | None = None,
 ) -> str:
     lang_code, fonts, labels = _LANG_SETTINGS.get(language, _LANG_SETTINGS["English"])
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -338,6 +355,7 @@ def _build_typst(
     _sim_md = report_md or final_report_md or ""
     sim_body = _md_to_typst(_sim_md) if _sim_md else labels["no_simulation"]
     final_body = _md_to_typst(final_report_md) if final_report_md else labels["no_final_report"]
+    gtm_body = _md_to_typst(gtm_md) if gtm_md else labels.get("no_gtm", "_No launch strategy available._")
 
     params = sim_params or {}
     platforms_str = _escape_typst_markup(", ".join(params.get("platforms", [])) or "—")
@@ -482,6 +500,13 @@ def _build_typst(
 
 #pagebreak()
 
+// ── GTM 전략 ──────────────────────────────────────────────
+= {labels["section_gtm"]}
+
+{gtm_body}
+
+#pagebreak()
+
 // ── 최종 보고서 ──────────────────────────────────────────
 = {labels["section_final_report"]}
 
@@ -499,6 +524,7 @@ async def build_pdf(
     sim_params: dict | None = None,
     final_report_md: str | None = None,
     idea_title: str = "",
+    gtm_md: str | None = None,
 ) -> bytes:
     typ_content = _build_typst(
         domain=domain or input_text[:60],
@@ -509,6 +535,7 @@ async def build_pdf(
         sim_params=sim_params,
         final_report_md=final_report_md,
         idea_title=idea_title,
+        gtm_md=gtm_md,
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:

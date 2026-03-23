@@ -15,6 +15,8 @@ export type SimEvent =
   | { type: 'sim_platform_post'; post: SocialPost }
   | { type: 'sim_round_summary'; round_num: number }
   | { type: 'sim_report'; data: Record<string, unknown> }
+  | { type: 'sim_gtm_report'; data: { markdown: string } }
+  | { type: 'sim_final_report'; data: { markdown: string } }
   | { type: 'sim_warning'; message: string }
   | { type: 'sim_error'; message: string }
   | { type: 'sim_done' }

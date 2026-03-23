@@ -99,6 +99,7 @@ def init_db(path: str | Path = DB_PATH) -> None:
             "sources_json": "TEXT NOT NULL DEFAULT '[]'",
             "final_report_md": "TEXT NOT NULL DEFAULT ''",
             "context_nodes_json": "TEXT NOT NULL DEFAULT '[]'",
+            "gtm_md": "TEXT NOT NULL DEFAULT ''",
         })
         _ensure_columns(conn, "simulations", {
             "cancel_requested": "INTEGER NOT NULL DEFAULT 0",
@@ -325,16 +326,17 @@ def save_sim_results(
     raw_items: list[dict] | None = None,
     final_report_md: str = "",
     context_nodes: list[dict] | None = None,
+    gtm_md: str = "",
 ) -> None:
     with _conn(path) as conn:
         conn.execute(
             "INSERT OR REPLACE INTO sim_results "
-            "(sim_id, posts_json, personas_json, report_json, report_md, analysis_md, sources_json, final_report_md, context_nodes_json) "
-            "VALUES (?,?,?,?,?,?,?,?,?)",
+            "(sim_id, posts_json, personas_json, report_json, report_md, analysis_md, sources_json, final_report_md, context_nodes_json, gtm_md) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
             (sim_id, json.dumps(posts, ensure_ascii=False), json.dumps(personas, ensure_ascii=False),
              json.dumps(report_json, ensure_ascii=False), report_md, analysis_md,
              json.dumps(raw_items or [], ensure_ascii=False), final_report_md,
-             json.dumps(context_nodes or [], ensure_ascii=False)),
+             json.dumps(context_nodes or [], ensure_ascii=False), gtm_md),
         )
 
 

@@ -402,6 +402,7 @@ async def export_pdf(sim_id: str):
         sim_params=sim_params,
         final_report_md=results.get("final_report_md"),
         idea_title=idea_title,
+        gtm_md=results.get("gtm_md"),
     )
     return StreamingResponse(
         iter([pdf_bytes]),

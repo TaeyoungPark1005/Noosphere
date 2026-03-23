@@ -89,6 +89,98 @@ Respond entirely in {language}."""
     return response.content or ""
 
 
+_GTM_SYSTEM = """\
+You are a go-to-market strategist specializing in early-stage product launches.
+Given simulation results showing how different communities reacted to a product idea,
+generate a concrete, actionable launch strategy.
+Focus on: where to launch, who to target first, how to message, and what risks to pre-empt."""
+
+
+async def generate_gtm_report(
+    report_json: dict,
+    analysis_md: str,
+    input_text: str,
+    language: str = "English",
+    provider: str = "openai",
+) -> str:
+    """
+    시뮬레이션 결과(report_json)와 경쟁 분석(analysis_md)을 기반으로
+    Go-to-Market 전략 보고서를 생성합니다.
+    """
+    if not report_json:
+        return "## Launch Strategy\n\n_No simulation data available._"
+
+    verdict = report_json.get("verdict", "mixed")
+    segments = report_json.get("segments", [])
+    criticisms = report_json.get("criticism_clusters", [])
+    improvements = report_json.get("improvements", [])
+
+    # Build segment sentiment summary
+    seg_lines = []
+    for seg in segments:
+        seg_lines.append(f"- {seg.get('name', '')}: {seg.get('sentiment', 'neutral')} — {seg.get('summary', '')[:150]}")
+    seg_summary = "\n".join(seg_lines) if seg_lines else "No segment data"
+
+    # Build criticism summary
+    crit_lines = []
+    for c in criticisms:
+        crit_lines.append(f"- {c.get('theme', '')} ({c.get('count', 0)} mentions)")
+    crit_summary = "\n".join(crit_lines) if crit_lines else "No criticisms recorded"
+
+    # Build improvements summary
+    imp_lines = []
+    for imp in improvements:
+        imp_lines.append(f"- {imp.get('suggestion', '')} (×{imp.get('frequency', 1)})")
+    imp_summary = "\n".join(imp_lines) if imp_lines else "No improvements recorded"
+
+    prompt = f"""Product idea: {input_text}
+
+Overall verdict: {verdict}
+
+Segment reactions:
+{seg_summary}
+
+Top criticisms:
+{crit_summary}
+
+Top improvement suggestions:
+{imp_summary}
+
+Competitive context (summary):
+{analysis_md[:1500]}
+
+---
+Generate a Go-to-Market strategy report with this EXACT structure:
+
+## Platform Priority
+Rank the 5 platforms (Hacker News, Product Hunt, Indie Hackers, Reddit r/startups, LinkedIn) by launch priority based on which segments responded most positively. For each, explain WHY and HOW to approach it specifically.
+
+## Ideal Customer Profile (ICP)
+Based on the segments with positive/neutral sentiment, define the primary ICP: who they are, what job they're trying to do, what triggers them to seek a solution.
+
+## Messaging Strategy
+For each top criticism cluster, write a specific counter-message or positioning adjustment. How should the product be framed to pre-empt the objection?
+
+## Product Priorities Before Launch
+From the improvement suggestions, identify the top 2-3 things to fix or add BEFORE the first public launch to maximize reception.
+
+## Risk Assessment
+Apply inversion thinking: what are the 2-3 most likely ways this launch could fail, and what would prevent each?
+
+Respond entirely in {language}. Be specific and actionable, not generic."""
+
+    response = await llm.complete(
+        messages=[
+            {"role": "system", "content": _GTM_SYSTEM},
+            {"role": "user", "content": prompt},
+        ],
+        tier="high",
+        provider=provider,
+        max_tokens=8192,
+    )
+    return response.content or "## Launch Strategy\n\n_Generation failed._"
+
+
 _FINAL_REPORT_SYSTEM = """\
 You are a senior product analyst. You are given two inputs:
 1. A competitive landscape analysis (from real-world sources)
@@ -120,6 +212,7 @@ async def generate_final_report(
     input_text: str,
     language: str = "English",
     provider: str = "openai",
+    gtm_md: str = "",
 ) -> str:
     """
     analysis_md(소스 분석)와 report_json(시뮬레이션 결과)를 종합한
@@ -130,6 +223,14 @@ async def generate_final_report(
 
     sim_summary = _fmt_report_json(report_json)
 
+    gtm_section = ""
+    if gtm_md:
+        gtm_section = f"""
+---
+## 3. Go-to-Market Strategy
+{gtm_md[:3000]}
+"""
+
     prompt = f"""Idea: {input_text}
 
 ---
@@ -139,7 +240,7 @@ async def generate_final_report(
 ---
 ## 2. Simulation Results Summary
 {sim_summary}
-
+{gtm_section}
 ---
 Write the final report in this exact structure:
 ## Executive Summary
@@ -148,7 +249,7 @@ Write the final report in this exact structure:
 ## Strategic Recommendations
 ## Conclusion
 
-Be direct and actionable. Respond entirely in {language}."""
+Be direct and actionable. Synthesize all available inputs. Respond entirely in {language}."""
 
     response = await llm.complete(
         messages=[

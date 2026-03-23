@@ -9,7 +9,7 @@ import { getResults, exportPdfUrl } from '../api'
 import { VERDICT_CONFIG } from '../constants'
 import type { SimResults } from '../types'
 
-type Tab = 'analysis' | 'simulation' | 'final' | 'details'
+type Tab = 'analysis' | 'simulation' | 'launch' | 'final' | 'details'
 
 export function ResultPage() {
   const { simId } = useParams<{ simId: string }>()
@@ -31,6 +31,7 @@ export function ResultPage() {
   const tabs: { id: Tab; label: string }[] = [
     { id: 'analysis',   label: 'Analysis' },
     { id: 'simulation', label: 'Simulation' },
+    { id: 'launch',     label: 'Launch Strategy' },
     { id: 'final',      label: 'Final Report' },
     { id: 'details',    label: 'Details' },
   ]
@@ -127,6 +128,9 @@ export function ResultPage() {
               )}
               {tab === 'simulation' && (
                 <ReportView report={results.report_json} />
+              )}
+              {tab === 'launch' && (
+                <MarkdownView content={results.gtm_md || '_Launch strategy not yet available._'} />
               )}
               {tab === 'final' && (
                 <MarkdownView content={results.final_report_md || '_Final report not yet available._'} />

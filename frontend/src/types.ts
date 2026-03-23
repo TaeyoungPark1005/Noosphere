@@ -85,6 +85,7 @@ export interface SimResults {
   report_md: string
   analysis_md: string
   sources_json: SourceItem[]
+  gtm_md: string
   final_report_md: string
   context_nodes_json: ContextGraphNode[]
 }
