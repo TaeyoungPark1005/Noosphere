@@ -253,7 +253,8 @@ async def decide_action(
         f"Your persona: {persona.name}, {persona.role} at {persona.company} "
         f"({persona.seniority}, {persona.affiliation}, age {persona.age})\n"
         f"Bias: {persona.bias_description()}\n"
-        f"Allowed actions: {', '.join(allowed)}\n\n"
+        + (f"Emotional state: {persona.emotional_state}\n" if persona.emotional_state else "")
+        + f"Allowed actions: {', '.join(allowed)}\n\n"
         f"{content_bias}"
         f"{feed_text}\n\n"
         f"Choose one action from {allowed}. "
@@ -309,7 +310,8 @@ async def generate_content(
         f"({persona.seniority}, {persona.affiliation}, age {persona.age}, {persona.generation}).\n"
         f"Interests: {', '.join(persona.interests[:5])}\n"
         f"Bias: {persona.bias_description()}\n"
-        f"Action: {action.action_type}"
+        + (f"Emotional state: {persona.emotional_state}\n" if persona.emotional_state else "")
+        + f"Action: {action.action_type}"
         + (f" (replying to post {action.target_post_id})" if action.target_post_id else "") + "\n\n"
         f"Idea being discussed: {idea_text}\n\n"
         + (f"Your domain knowledge:\n{prior_knowledge}\n\n" if prior_knowledge else "")
@@ -378,6 +380,9 @@ async def round_personas(
                         "commercial_focus": persona.commercial_focus,
                         "innovation_openness": persona.innovation_openness,
                         "source_title": persona.source_title,
+                        "jtbd": persona.jtbd,
+                        "cognitive_pattern": persona.cognitive_pattern,
+                        "emotional_state": persona.emotional_state,
                     },
                     "_persona": persona,
                 })

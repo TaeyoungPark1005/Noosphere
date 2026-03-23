@@ -21,6 +21,9 @@ class Persona:
     tech_area: list[str] = dataclasses.field(default_factory=list)
     market: list[str] = dataclasses.field(default_factory=list)
     problem_domain: list[str] = dataclasses.field(default_factory=list)
+    jtbd: str = ""                # Job-to-be-Done: what this persona is trying to accomplish
+    cognitive_pattern: str = ""   # Dominant thinking pattern (e.g., "Munger inversion")
+    emotional_state: str = ""     # Emotional context when encountering this product
 
     @property
     def generation(self) -> str:
@@ -56,11 +59,16 @@ class Persona:
             "early adopter" if self.innovation_openness <= 8 else
             "extreme risk-taker"
         )
-        return (
+        base = (
             f"skepticism {self.skepticism}/10 ({skeptic_label}), "
             f"commercial focus {self.commercial_focus}/10 ({commercial_label}), "
             f"innovation openness {self.innovation_openness}/10 ({innovation_label})"
         )
+        if self.jtbd:
+            base += f", JTBD: {self.jtbd}"
+        if self.cognitive_pattern:
+            base += f", thinking pattern: {self.cognitive_pattern}"
+        return base
 
 
 @dataclasses.dataclass

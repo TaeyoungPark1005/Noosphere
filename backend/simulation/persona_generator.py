@@ -31,7 +31,8 @@ _PLATFORM_AUDIENCE = {
         "software engineer, indie hacker (solo product builder), "
         "seed-stage VC analyst, non-technical founder, "
         "marketer at a dev-tool company, hobbyist coder (teacher / cafe owner / designer who codes on the side), "
-        "product manager, academic researcher, security professional, open-source maintainer. "
+        "product manager, academic researcher, security professional, open-source maintainer, "
+        "CFO at a startup (evaluates ROI and burn rate), CISO (evaluates security implications first). "
         "They all share intellectual curiosity and skepticism of hype. Generate a persona typical of this community."
     ),
     "producthunt": (
@@ -66,7 +67,11 @@ _PLATFORM_AUDIENCE = {
         "VP at a mid-size company, enterprise sales director, HR leader, "
         "corporate strategy consultant, B2B marketing manager, CTO at a 200-person company, "
         "VC partner focused on Series B+, procurement officer, "
-        "industry analyst, chief digital officer. "
+        "industry analyst, chief digital officer, "
+        "CMO thinking about channel differentiation and positioning, "
+        "CFO running unit economics and CAC/LTV analysis, "
+        "CPO evaluating problem-solution fit over feature completeness, "
+        "CTO defaulting to monolith thinking — 'do we need this complexity?'. "
         "They think in terms of ROI, risk, and organisational impact. Generate a persona typical of this community."
     ),
 }
@@ -164,11 +169,24 @@ _PERSONA_TOOL = {
                     "minItems": 0,
                     "maxItems": 2,
                 },
+                "jtbd": {
+                    "type": "string",
+                    "description": "Job-to-be-Done: what is this persona fundamentally trying to accomplish when they encounter this product idea? (1-2 sentences, specific and actionable)",
+                },
+                "cognitive_pattern": {
+                    "type": "string",
+                    "description": "Dominant cognitive lens this persona uses to evaluate new ideas. Examples: 'Inversion first — asks how this fails before considering upside', 'ROI gate — every idea must show unit economics', 'JTBD purist — only cares if this replaces something they already do', 'Early adopter bias — default yes unless there is a hard blocker'. Be specific to the persona's role and background.",
+                },
+                "emotional_state": {
+                    "type": "string",
+                    "description": "Emotional context when this persona encounters this product idea (1 short phrase). Examples: 'cautiously optimistic', 'skeptical but FOMO-aware', 'excited but budget-constrained', 'burned before by hype cycles'.",
+                },
             },
             "required": [
                 "name", "role", "age", "seniority", "affiliation", "company",
                 "mbti", "interests", "skepticism", "commercial_focus", "innovation_openness",
                 "domain_type", "tech_area", "market", "problem_domain",
+                "jtbd", "cognitive_pattern", "emotional_state",
             ],
         },
     },
@@ -186,7 +204,10 @@ Guidelines:
 - Age must be consistent with seniority (e.g. a c_suite persona should be 38+ years old, a junior persona 22-30).
 - Make the persona feel like a real individual: specific company, realistic age, coherent interests.
 - Vary skepticism, commercial_focus, and innovation_openness to reflect the diversity of real users on this platform.
-- Vary MBTI type across personas. Do NOT cluster on INTJ. Choose from the full 16 types; prefer less common types for variety."""
+- Vary MBTI type across personas. Do NOT cluster on INTJ. Choose from the full 16 types; prefer less common types for variety.
+- For jtbd: think about what specific outcome this person is trying to achieve in their professional life that makes this idea relevant (or irrelevant) to them. Ground it in their role, seniority, and platform context.
+- For cognitive_pattern: pick the ONE dominant mental model this type of person uses first when evaluating new tools or products. Make it specific, not generic.
+- For emotional_state: capture the underlying feeling that colors how they approach new product ideas, given their career stage and past experiences."""
 
 
 _FALLBACK_NAMES = [
@@ -329,4 +350,7 @@ async def generate_persona(
         tech_area=tech_area,
         market=market,
         problem_domain=problem_domain,
+        jtbd=data.get("jtbd", ""),
+        cognitive_pattern=data.get("cognitive_pattern", ""),
+        emotional_state=data.get("emotional_state", ""),
     )
