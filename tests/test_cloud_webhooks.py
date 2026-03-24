@@ -131,6 +131,26 @@ class TestStripeWebhook:
             handle_stripe_webhook(b"payload", "sig")
         assert get_user_credits("u_new_from_stripe") == 260
 
+    def test_checkout_completed_restores_soft_deleted_user(self):
+        """Soft-deleted user who repurchases must be restored and receive credits."""
+        from backend.cloud.billing import soft_delete_user
+        upsert_user("u_restored")
+        soft_delete_user("u_restored")
+        assert get_user_credits("u_restored") == 0  # deleted, credits = 0
+
+        session = {
+            "id": "cs_test_restore",
+            "metadata": {"user_id": "u_restored", "price_id": "price_65cr"},
+        }
+        event = {
+            "type": "checkout.session.completed",
+            "data": {"object": session},
+        }
+        with patch("stripe.Webhook.construct_event", return_value=event):
+            handle_stripe_webhook(b"payload", "sig")
+        # User should be undeleted and have 65 credits
+        assert get_user_credits("u_restored") == 65
+
 
 # ---------------------------------------------------------------------------
 # Clerk webhook
