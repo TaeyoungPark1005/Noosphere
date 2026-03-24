@@ -145,7 +145,7 @@ type SimNodeBase = { id: string; x: number; y: number; vx: number; vy: number }
 
 /** compOf 맵을 기반으로 연결 컴포넌트 중심으로 노드를 끌어당기는 d3 force 콜백을 반환한다. */
 function makeClusterForce(nodes: readonly { id: string }[], compOf: Map<string, number>, strength: number) {
-  // compCenter를 클로저 수준으로 끌어올려 틱마다 Map을 새로 할당하지 않고 재사용한다.
+  // 틱마다 Map 재할당 시 GC 압력을 피하기 위해 클로저 수준에서 선언.
   const compCenter = new Map<number, { x: number; y: number; count: number }>()
   return (alpha: number) => {
     const simNodes = nodes as unknown as SimNodeBase[]
@@ -157,7 +157,10 @@ function makeClusterForce(nodes: readonly { id: string }[], compOf: Map<string, 
       c.x += n.x; c.y += n.y; c.count++
       compCenter.set(comp, c)
     }
-    for (const c of compCenter.values()) { c.x /= c.count; c.y /= c.count }
+    for (const c of compCenter.values()) {
+      if (c.count <= 1) continue
+      c.x /= c.count; c.y /= c.count
+    }
     for (const n of simNodes) {
       const comp = compOf.get(n.id)
       if (comp === undefined) continue
@@ -503,8 +506,8 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
 // ── ContextGraph ───────────────────────────────────────────────────────────────
 
 /** weight를 [0, 1] 범위로 정규화한다. weight 범위: 8(최소) ~ 30+(최대) */
-function normalizeWeight(link: unknown): number {
-  const w = (link as { weight?: number }).weight ?? 8
+function normalizeWeight(link: ContextRenderLinkData): number {
+  const w = link.weight ?? 8
   return Math.min(Math.max((w - 8) / 22, 0), 1)
 }
 
