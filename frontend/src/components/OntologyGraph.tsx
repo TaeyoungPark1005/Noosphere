@@ -318,12 +318,8 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
     return { nodes: graphNodes, links }
   }, [graphNodes, data.relationships])
 
-  // 연결 컴포넌트별 클러스터 force
-  useEffect(() => {
-    const fg = graphRef.current
-    if (!fg || graphData.nodes.length === 0) return
-
-    // 인접 리스트 구성 (from/to는 항상 string)
+  // BFS로 연결 컴포넌트 맵 계산 (graphData가 바뀔 때만 재실행)
+  const compOf = useMemo(() => {
     const adj = new Map<string, Set<string>>()
     for (const node of graphData.nodes) adj.set(node.id, new Set())
     for (const link of graphData.links) {
@@ -331,10 +327,8 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
       const t = (link as unknown as { to: string }).to
       if (s && t) { adj.get(s)?.add(t); adj.get(t)?.add(s) }
     }
-
-    // BFS로 연결 컴포넌트 탐색
     const visited = new Set<string>()
-    const compOf = new Map<string, number>()
+    const map = new Map<string, number>()
     let numComps = 0
     for (const node of graphData.nodes) {
       if (visited.has(node.id)) continue
@@ -342,13 +336,20 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
       visited.add(node.id)
       while (queue.length) {
         const cur = queue.shift()!
-        compOf.set(cur, numComps)
+        map.set(cur, numComps)
         for (const nb of adj.get(cur) ?? []) {
           if (!visited.has(nb)) { visited.add(nb); queue.push(nb) }
         }
       }
       numComps++
     }
+    return map
+  }, [graphData])
+
+  // 연결 컴포넌트별 클러스터 force
+  useEffect(() => {
+    const fg = graphRef.current
+    if (!fg || graphData.nodes.length === 0) return
 
     // 클러스터 내 노드들의 현재 평균 위치로 서로 뭉치게 하는 force
     fg.d3Force('cluster', (alpha: number) => {
@@ -385,7 +386,7 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
       fg.d3Force('collide', forceCollide(28))
       fg.d3ReheatSimulation()
     })
-  }, [graphData])
+  }, [graphData, compOf])
 
   // Nodes/edges connected to the selected entity
   const highlightSet = useMemo(() => {
@@ -563,6 +564,34 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
 
   const graphRef = useRef<ContextGraphHandle | undefined>(undefined)
 
+  // BFS로 연결 컴포넌트 맵 계산 (graphData가 바뀔 때만 재실행)
+  const compOf = useMemo(() => {
+    const adj = new Map<string, Set<string>>()
+    for (const node of graphData.nodes) adj.set(node.id, new Set())
+    for (const link of graphData.links) {
+      const s = getEndpointId(link.source as string | { id?: string | number })
+      const t = getEndpointId(link.target as string | { id?: string | number })
+      if (s && t) { adj.get(s)?.add(t); adj.get(t)?.add(s) }
+    }
+    const visited = new Set<string>()
+    const map = new Map<string, number>()
+    let numComps = 0
+    for (const node of graphData.nodes) {
+      if (visited.has(node.id)) continue
+      const queue = [node.id]
+      visited.add(node.id)
+      while (queue.length) {
+        const cur = queue.shift()!
+        map.set(cur, numComps)
+        for (const nb of adj.get(cur) ?? []) {
+          if (!visited.has(nb)) { visited.add(nb); queue.push(nb) }
+        }
+      }
+      numComps++
+    }
+    return map
+  }, [graphData])
+
   // 반발력 + 클러스터 force 설정
   useEffect(() => {
     const fg = graphRef.current
@@ -575,32 +604,6 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
       const t = Math.min(Math.max((w - 8) / 22, 0), 1)
       return 200 - t * 140
     })
-
-    // 연결 컴포넌트 탐색
-    const adj = new Map<string, Set<string>>()
-    for (const node of graphData.nodes) adj.set(node.id, new Set())
-    for (const link of graphData.links) {
-      const s = getEndpointId(link.source as string | { id?: string | number })
-      const t = getEndpointId(link.target as string | { id?: string | number })
-      if (s && t) { adj.get(s)?.add(t); adj.get(t)?.add(s) }
-    }
-
-    const visited = new Set<string>()
-    const compOf = new Map<string, number>()
-    let numComps = 0
-    for (const node of graphData.nodes) {
-      if (visited.has(node.id)) continue
-      const queue = [node.id]
-      visited.add(node.id)
-      while (queue.length) {
-        const cur = queue.shift()!
-        compOf.set(cur, numComps)
-        for (const nb of adj.get(cur) ?? []) {
-          if (!visited.has(nb)) { visited.add(nb); queue.push(nb) }
-        }
-      }
-      numComps++
-    }
 
     // 클러스터 내 노드들의 현재 평균 위치로 서로 뭉치게 하는 force
     fg.d3Force('cluster', (alpha: number) => {
@@ -635,7 +638,7 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
       fg.d3Force('collide', forceCollide(50))
       fg.d3ReheatSimulation()
     })
-  }, [graphData])
+  }, [graphData, compOf])
 
   const handleEngineStop = useCallback(() => {
     graphRef.current?.zoomToFit(400, 24)

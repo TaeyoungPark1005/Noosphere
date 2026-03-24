@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 
 export function MarkdownView({ content }: { content: string | null | undefined }) {
@@ -6,13 +7,13 @@ export function MarkdownView({ content }: { content: string | null | undefined }
   // CommonMark spec says ** followed/preceded by a punctuation char (like ") is not a valid
   // flanking delimiter run unless surrounded by whitespace/punctuation on the other side.
   // U+200D is category Cf (not whitespace, not punctuation), so it makes ** flanking-valid.
-  const normalized = content
+  const normalized = useMemo(() => content
     ? content
         .replace(/[\u201C\u201D]/g, '"')
         .replace(/[\u2018\u2019]/g, "'")
         .replace(/\*\*(['"'"])/g, '**\u200D$1')
         .replace(/(['"'"])\*\*/g, '$1\u200D**')
-    : content
+    : content, [content])
   if (!normalized?.trim()) {
     return (
       <div style={{ padding: 48, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>

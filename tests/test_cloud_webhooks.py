@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.cloud.billing import get_user_credits, upsert_user
+from backend.cloud.billing import get_user_credits, soft_delete_user, upsert_user
 from backend.cloud.billing import handle_stripe_webhook
 from backend.cloud.auth import handle_clerk_webhook
 
@@ -90,7 +90,6 @@ class TestStripeWebhook:
 
     def test_checkout_completed_restores_soft_deleted_user(self):
         """Soft-deleted user who repurchases must be restored and receive credits."""
-        from backend.cloud.billing import soft_delete_user
         upsert_user("u_restored")
         soft_delete_user("u_restored")
 
