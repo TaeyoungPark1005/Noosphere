@@ -100,7 +100,7 @@ def _get_openai_client() -> openai.AsyncOpenAI:
     global _openai_client
     if _openai_client is None:
         api_key = os.environ.get("OPENAI_API_KEY", "")
-        _openai_client = openai.AsyncOpenAI(api_key=api_key, timeout=60.0)
+        _openai_client = openai.AsyncOpenAI(api_key=api_key, timeout=None)
     return _openai_client
 
 
@@ -183,7 +183,7 @@ def _get_anthropic_client() -> _anthropic.AsyncAnthropic:
     global _anthropic_client
     if _anthropic_client is None:
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        _anthropic_client = _anthropic.AsyncAnthropic(api_key=api_key, timeout=60.0)
+        _anthropic_client = _anthropic.AsyncAnthropic(api_key=api_key, timeout=None)
     return _anthropic_client
 
 

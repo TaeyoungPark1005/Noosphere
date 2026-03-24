@@ -177,6 +177,7 @@ Respond entirely in {language}. Be specific and actionable, not generic."""
         tier="high",
         provider=provider,
         max_tokens=8192,
+        timeout=300.0,
     )
     return response.content or "## Launch Strategy\n\n_Generation failed._"
 
@@ -259,5 +260,6 @@ Be direct and actionable. Synthesize all available inputs. Respond entirely in {
         tier="high",
         provider=provider,
         max_tokens=8192,
+        timeout=300.0,
     )
     return response.content or "## Final Report\n\n_Generation failed._"
