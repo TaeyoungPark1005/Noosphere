@@ -12,17 +12,20 @@ import pytest
 # Make the cloud overrides importable
 sys.path.insert(0, "/Users/taeyoungpark/Desktop/noosphere-cloud/overrides")
 
-# Override DB_PATH before importing billing
-_TMP_DB = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_TMP_DB.close()
-os.environ["DB_PATH"] = _TMP_DB.name
-os.environ["STRIPE_SECRET_KEY"] = "sk_test_dummy"
-os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_dummy"
-os.environ["STRIPE_PRICE_65CR"] = "price_65cr"
-os.environ["STRIPE_PRICE_260CR"] = "price_260cr"
-os.environ["STRIPE_PRICE_650CR"] = "price_650cr"
-os.environ["FRONTEND_URL"] = "http://localhost:5173"
+# Set env vars before importing billing (billing reads DB_PATH at module import time)
+if "DB_PATH" not in os.environ:
+    _tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    _tmp.close()
+    os.environ["DB_PATH"] = _tmp.name
 
+os.environ.setdefault("STRIPE_SECRET_KEY", "sk_test_dummy")
+os.environ.setdefault("STRIPE_WEBHOOK_SECRET", "whsec_dummy")
+os.environ.setdefault("STRIPE_PRICE_65CR", "price_65cr")
+os.environ.setdefault("STRIPE_PRICE_260CR", "price_260cr")
+os.environ.setdefault("STRIPE_PRICE_650CR", "price_650cr")
+os.environ.setdefault("FRONTEND_URL", "http://localhost:5173")
+
+from backend.cloud.billing import DB_PATH as _BILLING_DB_PATH  # noqa: E402
 from backend.cloud.billing import (  # noqa: E402
     InsufficientCreditsError,
     calculate_credit_cost,
@@ -40,13 +43,13 @@ from backend.cloud.billing import (  # noqa: E402
 @pytest.fixture(autouse=True)
 def clean_db():
     """Wipe and re-initialise billing tables before each test."""
-    con = sqlite3.connect(_TMP_DB.name)
+    con = sqlite3.connect(_BILLING_DB_PATH)
     con.execute("DROP TABLE IF EXISTS users")
     con.execute("DROP TABLE IF EXISTS credit_ledger")
     con.execute("DROP TABLE IF EXISTS _billing_migration_done")
     con.commit()
     con.close()
-    _ensure_tables(_TMP_DB.name)
+    _ensure_tables(_BILLING_DB_PATH)
     yield
 
 
@@ -241,7 +244,7 @@ class TestFulfillPurchase:
 
 def _add_credits(user_id: str, amount: int) -> None:
     """Directly add credits to a user for test setup."""
-    con = sqlite3.connect(_TMP_DB.name)
+    con = sqlite3.connect(_BILLING_DB_PATH)
     con.execute("UPDATE users SET credits = credits + ? WHERE user_id = ?", (amount, user_id))
     con.commit()
     con.close()
