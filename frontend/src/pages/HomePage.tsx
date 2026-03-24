@@ -5,10 +5,10 @@ import { startSimulation } from '../api'
 import { PLATFORM_OPTIONS } from '../constants'
 import type { Platform, Provider, SimConfig } from '../types'
 
-const PROVIDER_OPTIONS: Array<{ id: Provider; label: string; description: string }> = [
+const PROVIDER_OPTIONS: Array<{ id: Provider; label: string; description: string; disabled?: boolean }> = [
   { id: 'openai',    label: 'GPT',    description: 'OpenAI GPT-5.4' },
-  { id: 'anthropic', label: 'Claude', description: 'Anthropic Claude' },
-  { id: 'gemini',    label: 'Gemini', description: 'Google Gemini' },
+  { id: 'anthropic', label: 'Claude', description: 'Coming Soon', disabled: true },
+  { id: 'gemini',    label: 'Gemini', description: 'Coming Soon', disabled: true },
 ]
 
 
@@ -70,8 +70,8 @@ const DEFAULT_SOURCE_LIMITS: Record<string, number> = Object.fromEntries(
 
 const DEFAULT_CONFIG: Omit<SimConfig, 'input_text'> = {
   language: 'English',
-  num_rounds: 12,
-  max_agents: 50,
+  num_rounds: 8,
+  max_agents: 30,
   platforms: ['hackernews', 'producthunt', 'indiehackers', 'reddit_startups', 'linkedin'],
   activation_rate: 0.25,
   source_limits: DEFAULT_SOURCE_LIMITS,
@@ -396,20 +396,24 @@ export function HomePage() {
               return (
                 <button
                   key={p.id}
-                  onClick={() => setConfig(c => ({ ...c, provider: p.id }))}
-                  className="platform-btn"
+                  onClick={() => !p.disabled && setConfig(c => ({ ...c, provider: p.id }))}
+                  className={p.disabled ? '' : 'platform-btn'}
                   title={p.description}
+                  disabled={p.disabled}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '7px 16px', fontSize: 13, borderRadius: 8, cursor: 'pointer',
+                    padding: '7px 16px', fontSize: 13, borderRadius: 8,
+                    cursor: p.disabled ? 'not-allowed' : 'pointer',
                     border: '1.5px solid',
-                    background: active ? '#1e293b' : '#fff',
-                    color: active ? '#fff' : '#475569',
-                    borderColor: active ? '#1e293b' : '#e2e8f0',
+                    background: p.disabled ? '#f8fafc' : active ? '#1e293b' : '#fff',
+                    color: p.disabled ? '#cbd5e1' : active ? '#fff' : '#475569',
+                    borderColor: p.disabled ? '#e2e8f0' : active ? '#1e293b' : '#e2e8f0',
                     fontWeight: active ? 600 : 400,
                     boxShadow: active ? '0 2px 8px rgba(30,41,59,0.25)' : 'none',
+                    opacity: p.disabled ? 0.6 : 1,
                   }}>
                   {p.label}
+                  {p.disabled && <span style={{ fontSize: 10, marginLeft: 4, color: '#94a3b8' }}>Soon</span>}
                 </button>
               )
             })}
