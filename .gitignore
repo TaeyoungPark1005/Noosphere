@@ -60,3 +60,6 @@ logs/
 # Tools
 .playwright-mcp/
 .superpowers/
+
+# Cloud overlay symlink (local dev only — points to noosphere-cloud/overrides)
+backend/cloud
