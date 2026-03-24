@@ -557,37 +557,38 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
 
   const [hoveredLink, setHoveredLink] = useState<{ key: string; label: string | null } | null>(null)
 
-  const { graphNodes, usedSources } = useMemo(() => {
-    const nodes: ContextRenderNode[] = []
+  const usedSources = useMemo(() => {
     const srcSet = new Set<string>()
+    for (const n of data.nodes) srcSet.add(getSourceKey(n.source))
+    return [...srcSet]
+  }, [data.nodes])
+
+  const graphNodes = useMemo(() => {
+    const nodes: ContextRenderNode[] = []
     for (const n of data.nodes) {
       const src = getSourceKey(n.source)
-      srcSet.add(src)
       if (!hiddenSources.has(src)) nodes.push({ ...n, color: getSourceColor(src) })
     }
-    return { graphNodes: nodes, usedSources: [...srcSet] }
+    return nodes
   }, [data.nodes, hiddenSources])
 
   const graphData = useMemo(() => {
     const visibleIds = new Set(graphNodes.map(n => n.id))
+    const edgePairs: [string, string][] = []
     const links: ContextRenderLink[] = data.edges
       .filter(e => visibleIds.has(e.source) && visibleIds.has(e.target))
-      .map(e => ({
-        ...e,
-        source: e.source,
-        target: e.target,
-      }))
-    return { nodes: graphNodes, links }
+      .map(e => {
+        edgePairs.push([e.source, e.target])
+        return { ...e, source: e.source, target: e.target }
+      })
+    return { nodes: graphNodes, links, edgePairs }
   }, [graphNodes, data.edges])
 
   const graphRef = useRef<ContextGraphHandle | undefined>(undefined)
 
   const compOf = useMemo(() => buildComponentMap(
     graphData.nodes.map(n => n.id),
-    graphData.links.map(link => [
-      getEndpointId(link.source as string | { id?: string | number }),
-      getEndpointId(link.target as string | { id?: string | number }),
-    ])
+    graphData.edgePairs
   ), [graphData])
 
   useEffect(() => {
