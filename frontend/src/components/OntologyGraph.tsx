@@ -62,8 +62,6 @@ interface GraphNode {
 interface GraphLinkData {
   type: string
   color: string
-  from: string
-  to: string
 }
 
 type GraphLink = LinkObject<GraphNode, GraphLinkData>
@@ -360,16 +358,17 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
   )
 
   const graphData = useMemo(() => {
-    const visibleIds = new Set(graphNodes.map(n => n.id))
+    const nodeIds = graphNodes.map(n => n.id)
+    const visibleIds = new Set(nodeIds)
     const edgePairs: [string, string][] = []
     const links: GraphLink[] = []
     for (const r of data.relationships) {
       if (visibleIds.has(r.from) && visibleIds.has(r.to)) {
         edgePairs.push([r.from, r.to])
-        links.push({ source: r.from, target: r.to, from: r.from, to: r.to, type: r.type, color: EDGE_COLORS[r.type] ?? '#cbd5e1' })
+        links.push({ source: r.from, target: r.to, type: r.type, color: EDGE_COLORS[r.type] ?? '#cbd5e1' })
       }
     }
-    return { nodes: graphNodes, links, edgePairs, nodeIds: graphNodes.map(n => n.id) }
+    return { nodes: graphNodes, links, edgePairs, nodeIds }
   }, [graphNodes, data.relationships])
 
   const compOf = useMemo(() => buildComponentMap(
@@ -567,7 +566,8 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
   }, [data.nodes, hiddenSources])
 
   const graphData = useMemo(() => {
-    const visibleIds = new Set(graphNodes.map(n => n.id))
+    const nodeIds = graphNodes.map(n => n.id)
+    const visibleIds = new Set(nodeIds)
     const edgePairs: [string, string][] = []
     const links: ContextRenderLink[] = []
     for (const e of data.edges) {
@@ -576,7 +576,7 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
         links.push({ ...e })
       }
     }
-    return { nodes: graphNodes, links, edgePairs, nodeIds: graphNodes.map(n => n.id) }
+    return { nodes: graphNodes, links, edgePairs, nodeIds }
   }, [graphNodes, data.edges])
 
   const graphRef = useRef<ContextGraphHandle | undefined>(undefined)
