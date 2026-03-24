@@ -210,37 +210,46 @@ async def run_simulation(
                 }
     else:
         # --- NORMAL PATH ---
-        # Persona generation: one pool per platform, run in parallel
+        # Persona generation: all platforms run in parallel, events streamed in real-time
         platform_personas = {p.name: [] for p in active_platforms}
+        results_by_platform: dict[str, list[tuple[dict, "Persona | None"]]] = {}
+        persona_event_queue: asyncio.Queue = asyncio.Queue()
 
-        async def collect_personas_for_platform(platform_name: str) -> list[tuple[dict, Persona | None]]:
+        async def collect_personas_for_platform(platform_name: str) -> None:
             results = []
-            async for event in round_personas(
-                clusters, idea_text,
-                platform_name=platform_name,
-                provider=provider,
-            ):
-                persona = event.pop("_persona", None)
-                if persona is not None:
-                    results.append((event, persona))
-                else:
-                    results.append((event, None))
-            _deduplicate_names(results)
-            return results
-
-        persona_tasks = {
-            p.name: asyncio.create_task(collect_personas_for_platform(p.name))
-            for p in active_platforms
-        }
-        for platform_name, task in persona_tasks.items():
             try:
-                entries = await task
-                for event, persona in entries:
-                    if persona is not None:
-                        platform_personas[platform_name].append(persona)
-                    yield event
+                async for event in round_personas(
+                    clusters, idea_text,
+                    platform_name=platform_name,
+                    provider=provider,
+                ):
+                    persona = event.pop("_persona", None)
+                    results.append((event, persona))
+                    await persona_event_queue.put(event)
             except Exception as exc:
                 logger.warning("Persona generation failed for platform %s: %s", platform_name, exc)
+            finally:
+                results_by_platform[platform_name] = results
+                await persona_event_queue.put(None)  # sentinel
+
+        persona_tasks = [
+            asyncio.create_task(collect_personas_for_platform(p.name))
+            for p in active_platforms
+        ]
+        remaining = len(persona_tasks)
+        while remaining > 0:
+            item = await persona_event_queue.get()
+            if item is None:
+                remaining -= 1
+            else:
+                yield item
+
+        # Deduplicate names and build platform_personas after all events are streamed
+        for platform_name, entries in results_by_platform.items():
+            _deduplicate_names(entries)
+            for _event, persona in entries:
+                if persona is not None:
+                    platform_personas[platform_name].append(persona)
 
         if not any(platform_personas.values()):
             yield {"type": "sim_error", "message": "Persona generation failed for all platforms"}

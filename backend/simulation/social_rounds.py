@@ -254,7 +254,8 @@ async def decide_action(
         f"({persona.seniority}, {persona.affiliation}, age {persona.age})\n"
         f"Bias: {persona.bias_description()}\n"
         + (f"Emotional state: {persona.emotional_state}\n" if persona.emotional_state else "")
-        + f"Allowed actions: {', '.join(allowed)}\n\n"
+        + f"Note: You are a community member reacting to someone else's product idea. You are NOT the creator.\n"
+        f"Allowed actions: {', '.join(allowed)}\n\n"
         f"{content_bias}"
         f"{feed_text}\n\n"
         f"Choose one action from {allowed}. "
@@ -313,10 +314,11 @@ async def generate_content(
         + (f"Emotional state: {persona.emotional_state}\n" if persona.emotional_state else "")
         + f"Action: {action.action_type}"
         + (f" (replying to post {action.target_post_id})" if action.target_post_id else "") + "\n\n"
-        f"Idea being discussed: {idea_text}\n\n"
+        f"IMPORTANT: You are NOT the creator of the idea below. You are a third-party community member reacting to someone else's product pitch.\n"
+        f"Someone else's idea being discussed: {idea_text}\n\n"
         + (f"Your domain knowledge:\n{prior_knowledge}\n\n" if prior_knowledge else "")
         + f"{feed_text}\n\n"
-        f"Write your {action.action_type} in {language}. Be authentic to your persona and the platform style."
+        f"Write your {action.action_type} in {language}. Be authentic to your persona and the platform style. Do NOT claim to be the founder or creator of this idea."
     )
     try:
         response = await llm.complete(
