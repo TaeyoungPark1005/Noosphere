@@ -176,20 +176,15 @@ function makeClusterForce(nodes: readonly { id: string }[], compOf: Map<string, 
 
 interface SidePanelProps {
   entity: OntologyEntity | null
-  entities: OntologyEntity[]
+  entityMap: Map<string, OntologyEntity>
   relationships: OntologyRelationship[]
   contextNodes: Array<{ id: string; title: string; source: string; url?: string }>
   onClose: () => void
 }
 
-function SidePanel({ entity, entities, relationships, contextNodes, onClose }: SidePanelProps) {
+function SidePanel({ entity, entityMap, relationships, contextNodes, onClose }: SidePanelProps) {
   const entityId = entity?.id ?? null
   const sourceNodeIds = entity?.source_node_ids ?? EMPTY_NODE_IDS
-
-  const entityMap = useMemo(
-    () => Object.fromEntries(entities.map(e => [e.id, e])),
-    [entities]
-  )
 
   const outgoing = useMemo(
     () => entityId ? relationships.filter(r => r.from === entityId) : [],
@@ -252,7 +247,7 @@ function SidePanel({ entity, entities, relationships, contextNodes, onClose }: S
       {outgoing.length > 0 && (
         <div style={{ marginBottom: 12 }}>
           {outgoing.map((r, i) => {
-            const target = entityMap[r.to]
+            const target = entityMap.get(r.to)
             if (!target) return null
             return (
               <div key={i} style={{
@@ -279,7 +274,7 @@ function SidePanel({ entity, entities, relationships, contextNodes, onClose }: S
       {incoming.length > 0 && (
         <div style={{ marginBottom: 12 }}>
           {incoming.map((r, i) => {
-            const src = entityMap[r.from]
+            const src = entityMap.get(r.from)
             if (!src) return null
             return (
               <div key={i} style={{
@@ -381,13 +376,12 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
 
   const compOf = useMemo(() => buildComponentMap(
     graphData.nodes.map(n => n.id),
-    graphData.links.map(link => [
-      (link as unknown as GraphLinkData).from,
-      (link as unknown as GraphLinkData).to,
-    ])
+    graphData.links.map(link => {
+      const l = link as unknown as GraphLinkData
+      return [l.from, l.to] as [string, string]
+    })
   ), [graphData])
 
-  // 연결 컴포넌트별 클러스터 force
   useEffect(() => {
     const fg = graphRef.current
     if (!fg || graphData.nodes.length === 0) return
@@ -500,7 +494,7 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
         {selectedEntity && (
           <SidePanel
             entity={selectedEntity}
-            entities={data.entities}
+            entityMap={entityMap}
             relationships={data.relationships}
             contextNodes={contextNodes}
             onClose={() => setSelectedEntity(null)}
@@ -563,15 +557,14 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
 
   const [hoveredLink, setHoveredLink] = useState<{ key: string; label: string | null } | null>(null)
 
-  const graphNodes = useMemo(() =>
-    data.nodes
-      .filter(n => !hiddenSources.has(n.source.split(':')[0]))
-      .map(n => ({
-        ...n,
-        color: getSourceColor(n.source.split(':')[0]),
-      })),
-    [data.nodes, hiddenSources]
-  )
+  const graphNodes = useMemo(() => {
+    const result: ContextRenderNode[] = []
+    for (const n of data.nodes) {
+      const src = n.source.split(':')[0]
+      if (!hiddenSources.has(src)) result.push({ ...n, color: getSourceColor(src) })
+    }
+    return result
+  }, [data.nodes, hiddenSources])
 
   const graphData = useMemo(() => {
     const visibleIds = new Set(graphNodes.map(n => n.id))
@@ -595,7 +588,6 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
     ])
   ), [graphData])
 
-  // 반발력 + 클러스터 force 설정
   useEffect(() => {
     const fg = graphRef.current
     if (!fg || graphData.nodes.length === 0) return
