@@ -1,32 +1,10 @@
 """
 Tests for cloud billing module.
-Runs against an in-memory SQLite database.
 """
-import os
-import sqlite3
-import sys
-import tempfile
 import threading
 import pytest
 
-# Make the cloud overrides importable
-sys.path.insert(0, "/Users/taeyoungpark/Desktop/noosphere-cloud/overrides")
-
-# Set env vars before importing billing (billing reads DB_PATH at module import time)
-if "DB_PATH" not in os.environ:
-    _tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-    _tmp.close()
-    os.environ["DB_PATH"] = _tmp.name
-
-os.environ.setdefault("STRIPE_SECRET_KEY", "sk_test_dummy")
-os.environ.setdefault("STRIPE_WEBHOOK_SECRET", "whsec_dummy")
-os.environ.setdefault("STRIPE_PRICE_65CR", "price_65cr")
-os.environ.setdefault("STRIPE_PRICE_260CR", "price_260cr")
-os.environ.setdefault("STRIPE_PRICE_650CR", "price_650cr")
-os.environ.setdefault("FRONTEND_URL", "http://localhost:5173")
-
-from backend.cloud.billing import DB_PATH as _BILLING_DB_PATH  # noqa: E402
-from backend.cloud.billing import (  # noqa: E402
+from backend.cloud.billing import (
     InsufficientCreditsError,
     calculate_credit_cost,
     check_credits,
@@ -35,22 +13,8 @@ from backend.cloud.billing import (  # noqa: E402
     refund_credits,
     soft_delete_user,
     upsert_user,
-    _ensure_tables,
     _fulfill_purchase,
 )
-
-
-@pytest.fixture(autouse=True)
-def clean_db():
-    """Wipe and re-initialise billing tables before each test."""
-    con = sqlite3.connect(_BILLING_DB_PATH)
-    con.execute("DROP TABLE IF EXISTS users")
-    con.execute("DROP TABLE IF EXISTS credit_ledger")
-    con.execute("DROP TABLE IF EXISTS _billing_migration_done")
-    con.commit()
-    con.close()
-    _ensure_tables(_BILLING_DB_PATH)
-    yield
 
 
 # ---------------------------------------------------------------------------
@@ -59,18 +23,15 @@ def clean_db():
 
 class TestCalculateCreditCost:
     def test_basic(self):
-        # ceil(5*10*0.8*0.4)=ceil(16)=16, extra=ceil(0/100)=0 → 16
         assert calculate_credit_cost(5, 10, 0.8) == 16
 
     def test_minimum_one(self):
         assert calculate_credit_cost(0, 0, 0.0) == 1
 
     def test_with_source_limits(self):
-        # base = ceil(2*5*0.5*0.4)=ceil(2)=2, extra=ceil(300/100)=3 → 5
         assert calculate_credit_cost(2, 5, 0.5, {"google": 200, "reddit": 100}) == 5
 
     def test_fractional_rounds_up(self):
-        # ceil(1*1*0.1*0.4)=ceil(0.04)=1
         assert calculate_credit_cost(1, 1, 0.1) == 1
 
 
@@ -110,9 +71,9 @@ class TestCheckCredits:
         with pytest.raises(InsufficientCreditsError, match="need 5, have 0"):
             check_credits("u_poor", cost=5)
 
-    def test_passes_when_sufficient(self):
+    def test_passes_when_sufficient(self, add_credits):
         upsert_user("u_rich")
-        _add_credits("u_rich", 10)
+        add_credits("u_rich", 10)
         check_credits("u_rich", cost=5)  # should not raise
 
 
@@ -121,9 +82,9 @@ class TestCheckCredits:
 # ---------------------------------------------------------------------------
 
 class TestDeductCredits:
-    def test_deducts_correctly(self):
+    def test_deducts_correctly(self, add_credits):
         upsert_user("u_d1")
-        _add_credits("u_d1", 10)
+        add_credits("u_d1", 10)
         deduct_credits("u_d1", cost=3)
         assert get_user_credits("u_d1") == 7
 
@@ -132,10 +93,10 @@ class TestDeductCredits:
         with pytest.raises(InsufficientCreditsError):
             deduct_credits("u_d2", cost=1)
 
-    def test_atomic_under_concurrent_load(self):
+    def test_atomic_under_concurrent_load(self, add_credits):
         """Two threads cannot both deduct from a balance of 1."""
         upsert_user("u_concurrent")
-        _add_credits("u_concurrent", 1)
+        add_credits("u_concurrent", 1)
         errors = []
         successes = []
 
@@ -165,9 +126,9 @@ class TestDeductCredits:
 # ---------------------------------------------------------------------------
 
 class TestRefundCredits:
-    def test_refunds_correctly(self):
+    def test_refunds_correctly(self, add_credits):
         upsert_user("u_r1")
-        _add_credits("u_r1", 5)
+        add_credits("u_r1", 5)
         deduct_credits("u_r1", cost=3)
         refund_credits("u_r1", cost=3)
         assert get_user_credits("u_r1") == 5
@@ -181,15 +142,15 @@ class TestRefundCredits:
 # ---------------------------------------------------------------------------
 
 class TestSoftDeleteUser:
-    def test_zeroes_credits_and_hides_user(self):
+    def test_zeroes_credits_and_hides_user(self, add_credits):
         upsert_user("u_del")
-        _add_credits("u_del", 20)
+        add_credits("u_del", 20)
         soft_delete_user("u_del")
         assert get_user_credits("u_del") == 0
 
-    def test_check_credits_fails_after_delete(self):
+    def test_check_credits_fails_after_delete(self, add_credits):
         upsert_user("u_del2")
-        _add_credits("u_del2", 10)
+        add_credits("u_del2", 10)
         soft_delete_user("u_del2")
         with pytest.raises(InsufficientCreditsError):
             check_credits("u_del2", cost=1)
@@ -236,15 +197,3 @@ class TestFulfillPurchase:
         }
         _fulfill_purchase(session)
         assert get_user_credits("u_new") == 260
-
-
-# ---------------------------------------------------------------------------
-# helpers
-# ---------------------------------------------------------------------------
-
-def _add_credits(user_id: str, amount: int) -> None:
-    """Directly add credits to a user for test setup."""
-    con = sqlite3.connect(_BILLING_DB_PATH)
-    con.execute("UPDATE users SET credits = credits + ? WHERE user_id = ?", (amount, user_id))
-    con.commit()
-    con.close()
