@@ -77,6 +77,15 @@ except ModuleNotFoundError:  # pragma: no cover - allow config imports without w
 
 from pydantic import BaseModel, field_validator
 
+from backend.cloud.billing import (
+    InsufficientCreditsError,
+    check_credits,
+    deduct_credits,
+    refund_credits,
+)
+
+BILLING_ENABLED = os.getenv("BILLING_ENABLED", "false").lower() == "true"
+
 try:
     from backend.celery_app import REDIS_URL
     from backend.db import (
@@ -159,8 +168,8 @@ app.add_middleware(
 class SimConfig(BaseModel):
     input_text: str
     language: str = "English"
-    num_rounds: int = 12
-    max_agents: int = 50
+    num_rounds: int = 8
+    max_agents: int = 30
     platforms: list[str] = ["hackernews", "producthunt", "indiehackers", "reddit_startups", "linkedin"]
     activation_rate: float = 0.25
     source_limits: dict[str, int] = {}
@@ -204,8 +213,17 @@ async def health():
 
 
 @app.post("/simulate")
-async def simulate(config: SimConfig):
+async def simulate(config: SimConfig, request: Request):
     """Start a simulation via Celery worker. Returns sim_id for streaming."""
+    # Cloud mode: resolve user and check credits before doing any work.
+    user_id: str | None = None
+    if BILLING_ENABLED:
+        user_id = getattr(request.state, "user_id", None)
+        try:
+            check_credits(user_id)
+        except InsufficientCreditsError as exc:
+            raise HTTPException(402, str(exc) or "Insufficient credits")
+
     reconcile_stale_simulations(
         DB_PATH,
         queue_timeout_seconds=SIM_QUEUE_TIMEOUT_SECONDS,
@@ -223,10 +241,15 @@ async def simulate(config: SimConfig):
     create_simulation(DB_PATH, sim_id, config.input_text, config.language,
                       config.model_dump(), "")
 
+    if BILLING_ENABLED:
+        deduct_credits(user_id, sim_id=sim_id)
+
     try:
         run_simulation_task.apply_async(args=[sim_id, config.model_dump()], task_id=sim_id)
     except Exception:
         update_simulation_status(DB_PATH, sim_id, "failed", allowed_current_statuses={"running"})
+        if BILLING_ENABLED:
+            refund_credits(user_id, sim_id=sim_id)
         raise
     return {"sim_id": sim_id}
 
