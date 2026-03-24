@@ -16,8 +16,6 @@ const LandingPage = lazyPage(() => import('./pages/LandingPage'), 'LandingPage')
 const HomePage = lazyPage(() => import('./pages/HomePage'), 'HomePage')
 const SimulatePage = lazyPage(() => import('./pages/SimulatePage'), 'SimulatePage')
 const ResultPage = lazyPage(() => import('./pages/ResultPage'), 'ResultPage')
-const HistoryPage = lazyPage(() => import('./pages/HistoryPage'), 'HistoryPage')
-
 export function App() {
   return (
     <BrowserRouter>
@@ -28,7 +26,6 @@ export function App() {
           <Route path="/demo"                element={<Navigate to="/" replace />} />
           <Route path="/simulate/:simId"     element={<SimulatePage />} />
           <Route path="/result/:simId"       element={<ResultPage />} />
-          <Route path="/history"             element={<HistoryPage />} />
           <Route path="*"                    element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
