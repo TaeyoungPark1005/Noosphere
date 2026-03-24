@@ -318,6 +318,75 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
     return { nodes: graphNodes, links }
   }, [graphNodes, data.relationships])
 
+  // 연결 컴포넌트별 클러스터 force
+  useEffect(() => {
+    const fg = graphRef.current
+    if (!fg || graphData.nodes.length === 0) return
+
+    // 인접 리스트 구성 (from/to는 항상 string)
+    const adj = new Map<string, Set<string>>()
+    for (const node of graphData.nodes) adj.set(node.id, new Set())
+    for (const link of graphData.links) {
+      const s = (link as unknown as { from: string }).from
+      const t = (link as unknown as { to: string }).to
+      if (s && t) { adj.get(s)?.add(t); adj.get(t)?.add(s) }
+    }
+
+    // BFS로 연결 컴포넌트 탐색
+    const visited = new Set<string>()
+    const compOf = new Map<string, number>()
+    let numComps = 0
+    for (const node of graphData.nodes) {
+      if (visited.has(node.id)) continue
+      const queue = [node.id]
+      visited.add(node.id)
+      while (queue.length) {
+        const cur = queue.shift()!
+        compOf.set(cur, numComps)
+        for (const nb of adj.get(cur) ?? []) {
+          if (!visited.has(nb)) { visited.add(nb); queue.push(nb) }
+        }
+      }
+      numComps++
+    }
+
+    // 클러스터 내 노드들의 현재 평균 위치로 서로 뭉치게 하는 force
+    fg.d3Force('cluster', (alpha: number) => {
+      type SimNode = GraphNode & { x: number; y: number; vx: number; vy: number }
+      const nodes = graphData.nodes as SimNode[]
+
+      // 클러스터별 현재 중심 계산
+      const compCenter = new Map<number, { x: number; y: number; count: number }>()
+      for (const n of nodes) {
+        const comp = compOf.get(n.id)
+        if (comp === undefined) continue
+        const c = compCenter.get(comp) ?? { x: 0, y: 0, count: 0 }
+        c.x += n.x; c.y += n.y; c.count++
+        compCenter.set(comp, c)
+      }
+
+      // 각 노드를 클러스터 평균 중심으로 끌어당기기
+      for (const n of nodes) {
+        const comp = compOf.get(n.id)
+        if (comp === undefined) continue
+        const c = compCenter.get(comp)
+        if (!c || c.count <= 1) continue
+        const cx = c.x / c.count
+        const cy = c.y / c.count
+        n.vx += (cx - n.x) * alpha * 0.3
+        n.vy += (cy - n.y) * alpha * 0.3
+      }
+    })
+
+    fg.d3Force('charge')?.strength(-180)
+    fg.d3Force('link')?.distance(60)
+
+    import('d3-force-3d').then(({ forceCollide }) => {
+      fg.d3Force('collide', forceCollide(28))
+      fg.d3ReheatSimulation()
+    })
+  }, [graphData])
+
   // Nodes/edges connected to the selected entity
   const highlightSet = useMemo(() => {
     if (!selectedEntity) return null
@@ -494,22 +563,79 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
 
   const graphRef = useRef<ContextGraphHandle | undefined>(undefined)
 
-  // 반발력 설정 (MiroFish 참고: charge -400, collide 50)
+  // 반발력 + 클러스터 force 설정
   useEffect(() => {
     const fg = graphRef.current
-    if (!fg) return
+    if (!fg || graphData.nodes.length === 0) return
+
     fg.d3Force('charge')?.strength(-400)
     // weight는 정수 8~30+ 범위. 높을수록 가깝게(60px), 낮을수록 멀게(200px)
     fg.d3Force('link')?.distance((link: ContextRenderLink) => {
       const w = (link as unknown as { weight?: number }).weight ?? 8
-      const t = Math.min(Math.max((w - 8) / 22, 0), 1) // 8→0, 30→1
-      return 200 - t * 140 // 200px ~ 60px
+      const t = Math.min(Math.max((w - 8) / 22, 0), 1)
+      return 200 - t * 140
     })
-    // 노드 겹침 방지 (반지름 50px 이내 침범 금지)
+
+    // 연결 컴포넌트 탐색
+    const adj = new Map<string, Set<string>>()
+    for (const node of graphData.nodes) adj.set(node.id, new Set())
+    for (const link of graphData.links) {
+      const s = getEndpointId(link.source as string | { id?: string | number })
+      const t = getEndpointId(link.target as string | { id?: string | number })
+      if (s && t) { adj.get(s)?.add(t); adj.get(t)?.add(s) }
+    }
+
+    const visited = new Set<string>()
+    const compOf = new Map<string, number>()
+    let numComps = 0
+    for (const node of graphData.nodes) {
+      if (visited.has(node.id)) continue
+      const queue = [node.id]
+      visited.add(node.id)
+      while (queue.length) {
+        const cur = queue.shift()!
+        compOf.set(cur, numComps)
+        for (const nb of adj.get(cur) ?? []) {
+          if (!visited.has(nb)) { visited.add(nb); queue.push(nb) }
+        }
+      }
+      numComps++
+    }
+
+    // 클러스터 내 노드들의 현재 평균 위치로 서로 뭉치게 하는 force
+    fg.d3Force('cluster', (alpha: number) => {
+      type SimNode = ContextRenderNode & { x: number; y: number; vx: number; vy: number }
+      const nodes = graphData.nodes as SimNode[]
+
+      // 클러스터별 현재 중심 계산
+      const compCenter = new Map<number, { x: number; y: number; count: number }>()
+      for (const n of nodes) {
+        const comp = compOf.get(n.id)
+        if (comp === undefined) continue
+        const c = compCenter.get(comp) ?? { x: 0, y: 0, count: 0 }
+        c.x += n.x; c.y += n.y; c.count++
+        compCenter.set(comp, c)
+      }
+
+      // 각 노드를 클러스터 평균 중심으로 끌어당기기
+      for (const n of nodes) {
+        const comp = compOf.get(n.id)
+        if (comp === undefined) continue
+        const c = compCenter.get(comp)
+        if (!c || c.count <= 1) continue
+        const cx = c.x / c.count
+        const cy = c.y / c.count
+        n.vx += (cx - n.x) * alpha * 0.25
+        n.vy += (cy - n.y) * alpha * 0.25
+      }
+    })
+
+    // 노드 겹침 방지
     import('d3-force-3d').then(({ forceCollide }) => {
       fg.d3Force('collide', forceCollide(50))
+      fg.d3ReheatSimulation()
     })
-  }, [])
+  }, [graphData])
 
   const handleEngineStop = useCallback(() => {
     graphRef.current?.zoomToFit(400, 24)
@@ -520,19 +646,26 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
     if (node.url) window.open(node.url, '_blank', 'noreferrer')
   }, [])
 
-  // 6. 링크 색깔 (hover 시 강조)
+  // 6. 링크 색깔 — weight가 높을수록 진하게, hover 시 최대 강조
   const getLinkColor = useCallback((link: ContextRenderLink) => {
     const srcId = getEndpointId(link.source)
     const tgtId = getEndpointId(link.target)
     const key = `${srcId}→${tgtId}`
-    return hoveredLink === key ? '#f1f5f9' : 'rgba(148,163,184,0.3)'
+    if (hoveredLink === key) return '#f1f5f9'
+    const w = (link as unknown as { weight?: number }).weight ?? 8
+    const t = Math.min(Math.max((w - 8) / 22, 0), 1) // 8→0, 30+→1
+    const opacity = (0.15 + t * 0.55).toFixed(2)      // 0.15 ~ 0.70
+    return `rgba(148,163,184,${opacity})`
   }, [hoveredLink])
 
   const getLinkWidth = useCallback((link: ContextRenderLink) => {
     const srcId = getEndpointId(link.source)
     const tgtId = getEndpointId(link.target)
     const key = `${srcId}→${tgtId}`
-    return hoveredLink === key ? 2.5 : 1
+    if (hoveredLink === key) return 2.5
+    const w = (link as unknown as { weight?: number }).weight ?? 8
+    const t = Math.min(Math.max((w - 8) / 22, 0), 1)
+    return 0.5 + t * 1.5 // 0.5 ~ 2.0
   }, [hoveredLink])
 
   // 7. hover된 엣지 label 표시용 상태
