@@ -4,6 +4,8 @@
 
 **[English](./README.md)** · [한국어](./i18n/README.ko.md) · [日本語](./i18n/README.ja.md) · [中文（简体）](./i18n/README.zh-CN.md) · [中文（繁體）](./i18n/README.zh-TW.md) · [Español](./i18n/README.es.md) · [Français](./i18n/README.fr.md) · [Deutsch](./i18n/README.de.md) · [Português](./i18n/README.pt.md)
 
+[![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/taeyoung1005)
+
 </div>
 
 ---
@@ -264,4 +266,4 @@ npm run dev
 
 ## License
 
-MIT
+MIT — see [LICENSE](./LICENSE) for details.
