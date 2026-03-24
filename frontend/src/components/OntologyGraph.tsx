@@ -361,25 +361,26 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
 
   const graphData = useMemo(() => {
     const visibleIds = new Set(graphNodes.map(n => n.id))
+    const edgePairs: [string, string][] = []
     const links: GraphLink[] = data.relationships
       .filter(r => visibleIds.has(r.from) && visibleIds.has(r.to))
-      .map(r => ({
-        source: r.from,
-        target: r.to,
-        from: r.from,
-        to: r.to,
-        type: r.type,
-        color: EDGE_COLORS[r.type] ?? '#cbd5e1',
-      }))
-    return { nodes: graphNodes, links }
+      .map(r => {
+        edgePairs.push([r.from, r.to])
+        return {
+          source: r.from,
+          target: r.to,
+          from: r.from,
+          to: r.to,
+          type: r.type,
+          color: EDGE_COLORS[r.type] ?? '#cbd5e1',
+        }
+      })
+    return { nodes: graphNodes, links, edgePairs }
   }, [graphNodes, data.relationships])
 
   const compOf = useMemo(() => buildComponentMap(
     graphData.nodes.map(n => n.id),
-    graphData.links.map(link => {
-      const l = link as unknown as GraphLinkData
-      return [l.from, l.to] as [string, string]
-    })
+    graphData.edgePairs
   ), [graphData])
 
   useEffect(() => {
@@ -513,6 +514,10 @@ function normalizeWeight(link: ContextRenderLinkData): number {
   return Math.min(Math.max((w - 8) / 22, 0), 1)
 }
 
+function getSourceKey(source: string): string {
+  return source.split(':')[0]
+}
+
 function getSourceColor(source: string): string {
   for (const [key, color] of Object.entries(SOURCE_COLORS)) {
     if (source.startsWith(key) || source === key) return color
@@ -541,11 +546,6 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
   }, [widthProp])
   const width = widthProp ?? measuredWidth
 
-  const usedSources = useMemo(
-    () => [...new Set(data.nodes.map(n => n.source.split(':')[0]))],
-    [data.nodes]
-  )
-
   const [hiddenSources, setHiddenSources] = useState<Set<string>>(new Set())
   const toggleSource = useCallback((src: string) => {
     setHiddenSources(prev => {
@@ -557,13 +557,15 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
 
   const [hoveredLink, setHoveredLink] = useState<{ key: string; label: string | null } | null>(null)
 
-  const graphNodes = useMemo(() => {
-    const result: ContextRenderNode[] = []
+  const { graphNodes, usedSources } = useMemo(() => {
+    const nodes: ContextRenderNode[] = []
+    const srcSet = new Set<string>()
     for (const n of data.nodes) {
-      const src = n.source.split(':')[0]
-      if (!hiddenSources.has(src)) result.push({ ...n, color: getSourceColor(src) })
+      const src = getSourceKey(n.source)
+      srcSet.add(src)
+      if (!hiddenSources.has(src)) nodes.push({ ...n, color: getSourceColor(src) })
     }
-    return result
+    return { graphNodes: nodes, usedSources: [...srcSet] }
   }, [data.nodes, hiddenSources])
 
   const graphData = useMemo(() => {
