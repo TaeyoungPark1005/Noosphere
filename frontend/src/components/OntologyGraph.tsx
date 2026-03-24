@@ -141,6 +141,32 @@ function buildComponentMap(nodeIds: string[], edgePairs: [string, string][]): Ma
   return map
 }
 
+type SimNodeBase = { id: string; x: number; y: number; vx: number; vy: number }
+
+/** compOf 맵을 기반으로 연결 컴포넌트 중심으로 노드를 끌어당기는 d3 force 콜백을 반환한다. */
+function makeClusterForce(nodes: readonly { id: string }[], compOf: Map<string, number>, strength: number) {
+  return (alpha: number) => {
+    const simNodes = nodes as unknown as SimNodeBase[]
+    const compCenter = new Map<number, { x: number; y: number; count: number; cx: number; cy: number }>()
+    for (const n of simNodes) {
+      const comp = compOf.get(n.id)
+      if (comp === undefined) continue
+      const c = compCenter.get(comp) ?? { x: 0, y: 0, count: 0, cx: 0, cy: 0 }
+      c.x += n.x; c.y += n.y; c.count++
+      compCenter.set(comp, c)
+    }
+    for (const c of compCenter.values()) { c.cx = c.x / c.count; c.cy = c.y / c.count }
+    for (const n of simNodes) {
+      const comp = compOf.get(n.id)
+      if (comp === undefined) continue
+      const c = compCenter.get(comp)
+      if (!c || c.count <= 1) continue
+      n.vx += (c.cx - n.x) * alpha * strength
+      n.vy += (c.cy - n.y) * alpha * strength
+    }
+  }
+}
+
 // ── Side panel ────────────────────────────────────────────────────────────────
 
 interface SidePanelProps {
@@ -348,8 +374,8 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
   const compOf = useMemo(() => buildComponentMap(
     graphData.nodes.map(n => n.id),
     graphData.links.map(link => [
-      (link as unknown as { from: string }).from,
-      (link as unknown as { to: string }).to,
+      (link as unknown as GraphLinkData).from,
+      (link as unknown as GraphLinkData).to,
     ])
   ), [graphData])
 
@@ -359,27 +385,7 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
     if (!fg || graphData.nodes.length === 0) return
     let cancelled = false
 
-    fg.d3Force('cluster', (alpha: number) => {
-      type SimNode = GraphNode & { x: number; y: number; vx: number; vy: number }
-      const nodes = graphData.nodes as SimNode[]
-      const compCenter = new Map<number, { x: number; y: number; count: number }>()
-      for (const n of nodes) {
-        const comp = compOf.get(n.id)
-        if (comp === undefined) continue
-        const c = compCenter.get(comp) ?? { x: 0, y: 0, count: 0 }
-        c.x += n.x; c.y += n.y; c.count++
-        compCenter.set(comp, c)
-      }
-      for (const n of nodes) {
-        const comp = compOf.get(n.id)
-        if (comp === undefined) continue
-        const c = compCenter.get(comp)
-        if (!c || c.count <= 1) continue
-        n.vx += (c.x / c.count - n.x) * alpha * 0.3
-        n.vy += (c.y / c.count - n.y) * alpha * 0.3
-      }
-    })
-
+    fg.d3Force('cluster', makeClusterForce(graphData.nodes, compOf, 0.3))
     fg.d3Force('charge')?.strength(-180)
     fg.d3Force('link')?.distance(60)
 
@@ -507,7 +513,6 @@ interface ContextGraphProps {
 }
 
 export const ContextGraph = memo(function ContextGraph({ data, width: widthProp }: ContextGraphProps) {
-  // 0. 컨테이너 너비 자동 측정
   const containerRef = useRef<HTMLDivElement>(null)
   const [measuredWidth, setMeasuredWidth] = useState<number>(widthProp ?? 520)
   useEffect(() => {
@@ -523,13 +528,11 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
   }, [widthProp])
   const width = widthProp ?? measuredWidth
 
-  // 1. 소스 목록 (legend용)
   const usedSources = useMemo(
     () => [...new Set(data.nodes.map(n => n.source.split(':')[0]))],
     [data.nodes]
   )
 
-  // 2. 숨겨진 소스 (legend 토글용)
   const [hiddenSources, setHiddenSources] = useState<Set<string>>(new Set())
   const toggleSource = useCallback((src: string) => {
     setHiddenSources(prev => {
@@ -539,10 +542,8 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
     })
   }, [])
 
-  // 3. hover된 엣지 (강조용)
   const [hoveredLink, setHoveredLink] = useState<string | null>(null) // "sourceId→targetId"
 
-  // 4. graphData (filtered)
   const graphNodes = useMemo(() =>
     data.nodes
       .filter(n => !hiddenSources.has(n.source.split(':')[0]))
@@ -588,27 +589,7 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
       const t = Math.min(Math.max((w - 8) / 22, 0), 1)
       return 200 - t * 140
     })
-
-    fg.d3Force('cluster', (alpha: number) => {
-      type SimNode = ContextRenderNode & { x: number; y: number; vx: number; vy: number }
-      const nodes = graphData.nodes as SimNode[]
-      const compCenter = new Map<number, { x: number; y: number; count: number }>()
-      for (const n of nodes) {
-        const comp = compOf.get(n.id)
-        if (comp === undefined) continue
-        const c = compCenter.get(comp) ?? { x: 0, y: 0, count: 0 }
-        c.x += n.x; c.y += n.y; c.count++
-        compCenter.set(comp, c)
-      }
-      for (const n of nodes) {
-        const comp = compOf.get(n.id)
-        if (comp === undefined) continue
-        const c = compCenter.get(comp)
-        if (!c || c.count <= 1) continue
-        n.vx += (c.x / c.count - n.x) * alpha * 0.25
-        n.vy += (c.y / c.count - n.y) * alpha * 0.25
-      }
-    })
+    fg.d3Force('cluster', makeClusterForce(graphData.nodes, compOf, 0.25))
 
     import('d3-force-3d').then(({ forceCollide }) => {
       if (cancelled) return
@@ -622,12 +603,10 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
     graphRef.current?.zoomToFit(400, 24)
   }, [])
 
-  // 5. 노드 클릭 → URL 이동
   const handleNodeClick = useCallback((node: ContextRenderNode) => {
     if (node.url) window.open(node.url, '_blank', 'noreferrer')
   }, [])
 
-  // 6. 링크 색깔 — weight가 높을수록 진하게, hover 시 최대 강조
   const getLinkColor = useCallback((link: ContextRenderLink) => {
     const srcId = getEndpointId(link.source)
     const tgtId = getEndpointId(link.target)
@@ -649,7 +628,6 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
     return 0.5 + t * 1.5 // 0.5 ~ 2.0
   }, [hoveredLink])
 
-  // 7. hover된 엣지 label 표시용 상태
   const [hoveredLinkLabel, setHoveredLinkLabel] = useState<string | null>(null)
 
   const handleLinkHover = useCallback((link: ContextRenderLink | null) => {
