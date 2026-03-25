@@ -2,12 +2,10 @@
 Redis-based global rate limiter for LLM API calls.
 
 Enforces a sliding-window RPM limit shared across ALL Celery workers,
-preventing 429 errors. Supports all three providers independently.
+preventing 429 errors.
 
 Override via env:
   OPENAI_RPM=500          # OpenAI tier's actual limit (default 500)
-  ANTHROPIC_RPM=50        # Anthropic tier's actual limit (default 50)
-  GEMINI_RPM=60           # Gemini tier's actual limit (default 60)
   RPM_SAFETY=0.80         # fraction to actually use (default 0.80)
 """
 from __future__ import annotations
@@ -23,27 +21,19 @@ logger = logging.getLogger(__name__)
 _SAFETY = float(os.getenv("RPM_SAFETY", "0.80"))
 
 _PROVIDER_RPM: dict[str, int] = {
-    "openai":    max(1, int(int(os.getenv("OPENAI_RPM",    "500")) * _SAFETY)),
-    "anthropic": max(1, int(int(os.getenv("ANTHROPIC_RPM",  "50")) * _SAFETY)),
-    "gemini":    max(1, int(int(os.getenv("GEMINI_RPM",     "60")) * _SAFETY)),
+    "openai": max(1, int(int(os.getenv("OPENAI_RPM", "500")) * _SAFETY)),
 }
 
 _REDIS_KEYS: dict[str, str] = {
-    "openai":    "noosphere:openai:rpm",
-    "anthropic": "noosphere:anthropic:rpm",
-    "gemini":    "noosphere:gemini:rpm",
+    "openai": "noosphere:openai:rpm",
 }
 
 _PROVIDER_TPM: dict[str, int] = {
-    "openai":    max(1, int(int(os.getenv("OPENAI_TPM",    "100000")) * _SAFETY)),
-    "anthropic": max(1, int(int(os.getenv("ANTHROPIC_TPM",  "40000")) * _SAFETY)),
-    "gemini":    max(1, int(int(os.getenv("GEMINI_TPM",    "250000")) * _SAFETY)),
+    "openai": max(1, int(int(os.getenv("OPENAI_TPM", "100000")) * _SAFETY)),
 }
 
 _TPM_REDIS_KEYS: dict[str, str] = {
-    "openai":    "noosphere:openai:tpm",
-    "anthropic": "noosphere:anthropic:tpm",
-    "gemini":    "noosphere:gemini:tpm",
+    "openai": "noosphere:openai:tpm",
 }
 
 # ── Redis 클라이언트 (지연 초기화) ─────────────────────────────────────────
@@ -88,7 +78,7 @@ end
 async def acquire_api_slot(provider: str = "openai") -> None:
     """
     Rate-limit gate: LLM API를 호출하기 전에 이 함수를 await.
-    Redis 슬라이딩 윈도우로 전체 워커에 걸쳐 프로바이더별 RPM을 제한.
+    Redis 슬라이딩 윈도우로 전체 워커에 걸쳐 RPM을 제한.
     슬롯이 없으면 열릴 때까지 정밀하게 대기.
     """
     r = _get_redis()

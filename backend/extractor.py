@@ -30,7 +30,7 @@ Category query styles:
 Respond with ONLY valid JSON. No markdown, no explanation."""
 
 
-async def extract_concepts(input_text: str, provider: str = "openai") -> dict[str, Any]:
+async def extract_concepts(input_text: str) -> dict[str, Any]:
     """
     Extract concepts and generate per-category query bundles from input text.
     Returns dict with: concepts, domain, domain_type, search_queries, query_bundles.
@@ -68,7 +68,6 @@ Return ONLY the JSON object."""
                 {"role": "user", "content": prompt},
             ],
             tier="mid",
-            provider=provider,
             max_tokens=8192,
         )
         raw = (response.content or "").strip()

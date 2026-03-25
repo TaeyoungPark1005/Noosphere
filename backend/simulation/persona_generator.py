@@ -257,7 +257,6 @@ async def generate_persona(
     cluster: dict,
     idea_text: str = "",
     platform_name: str = "",
-    provider: str = "openai",
     ontology: dict | None = None,
 ) -> Persona:
     cluster = _normalize_cluster_input(cluster)
@@ -299,7 +298,6 @@ async def generate_persona(
                 {"role": "user", "content": prompt},
             ],
             tier="mid",
-            provider=provider,
             max_tokens=4096,
             tools=[_PERSONA_TOOL],
             tool_choice="create_persona",

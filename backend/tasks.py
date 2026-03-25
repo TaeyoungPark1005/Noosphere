@@ -279,7 +279,7 @@ def _calc_edges_for_node(new_node: dict, existing_nodes: list[dict], min_score: 
     return edges
 
 
-async def _summarize_idea_node(input_text: str, provider: str) -> dict:
+async def _summarize_idea_node(input_text: str) -> dict:
     """사용자 아이디어를 1000자 이내로 요약하고 구조화된 그래프 노드로 변환."""
     from backend import llm as _llm
 
@@ -302,7 +302,6 @@ Return a JSON object with exactly these fields:
         resp = await _llm.complete(
             messages=[{"role": "user", "content": prompt}],
             tier="low",
-            provider=provider,
             max_tokens=768,
             response_format={"type": "json_object"},
         )
@@ -332,7 +331,7 @@ Return a JSON object with exactly these fields:
     }
 
 
-async def _structurize_node(item: dict, provider: str) -> dict:
+async def _structurize_node(item: dict) -> dict:
     """LLM으로 문서 1개를 구조화 JSON으로 변환."""
     from backend import llm as _llm
     content = item.get("text") or item.get("abstract") or ""
@@ -356,7 +355,6 @@ Return a JSON object with exactly these fields:
         resp = await _llm.complete(
             messages=[{"role": "user", "content": prompt}],
             tier="low",
-            provider=provider,
             max_tokens=512,
             response_format={"type": "json_object"},
         )
@@ -387,7 +385,6 @@ Return a JSON object with exactly these fields:
 
 async def _enrich_context_nodes(
     raw_items: list[dict],
-    provider: str,
     on_node_done: "Callable[[dict, list[dict]], None] | None" = None,
 ) -> list[dict]:
     """문서 목록을 병렬로 구조화한다. 각 완료 시 on_node_done 콜백 호출."""
@@ -397,7 +394,7 @@ async def _enrich_context_nodes(
 
     async def _limited(item):
         async with sem:
-            node = await _structurize_node(item, provider)
+            node = await _structurize_node(item)
         async with lock:
             existing = list(enriched)  # 현재까지 완료된 노드 목록 복사
             enriched.append(node)
@@ -505,7 +502,7 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                 logger.info("Simulation %s will not start because it is no longer active", sim_id)
                 return
 
-            provider = config.get("provider", "openai")
+            provider = "openai"
             from backend import llm as _llm
             try:
                 _llm.check_provider_key(provider)
@@ -547,7 +544,7 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
             else:
                 # Fresh run: run analysis pipeline
                 publish({"type": "sim_progress", "message": "Analyzing your idea..."})
-                idea_node = await _summarize_idea_node(config["input_text"], provider)
+                idea_node = await _summarize_idea_node(config["input_text"])
                 publish({
                     "type": "sim_graph_node",
                     "node": {
@@ -569,7 +566,7 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
 
                 async def _structurize_and_emit(item: dict) -> dict:
                     async with _structurize_sem:
-                        node = await _structurize_node(item, provider)
+                        node = await _structurize_node(item)
                     async with _enriched_lock:
                         existing = list(_enriched_nodes)
                         _enriched_nodes.append(node)
@@ -610,7 +607,6 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                     config["input_text"],
                     limits=config.get("source_limits") or None,
                     on_source_done=on_source_done,
-                    provider=provider,
                 )
                 await checkpoint()
 
@@ -621,7 +617,7 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                 else:
                     context_nodes = [idea_node]
 
-                domain_str = await detect_domain(config["input_text"], provider=provider)
+                domain_str = await detect_domain(config["input_text"])
                 await asyncio.to_thread(update_simulation_domain, DB_PATH, sim_id, domain_str)
 
                 publish({
@@ -633,7 +629,6 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                     domain=domain_str,
                     input_text=idea_node["abstract"],
                     language=config["language"],
-                    provider=provider,
                 )
                 await checkpoint()
                 publish({"type": "sim_analysis", "data": {"markdown": analysis_md}})
@@ -660,7 +655,6 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                 language=config["language"],
                 activation_rate=config["activation_rate"],
                 edges=edges,
-                provider=provider,
                 checkpoint=existing_checkpoint,
             ):
                 await checkpoint()
@@ -698,7 +692,6 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                     analysis_md=analysis_md,
                     input_text=idea_summary,
                     language=config["language"],
-                    provider=provider,
                 )
                 publish({"type": "sim_gtm_report", "data": {"markdown": gtm_md}})
             except Exception as _e:
@@ -711,7 +704,6 @@ def run_simulation_task(self, sim_id: str, config: dict) -> None:
                     report_json=report_json,
                     input_text=idea_summary,
                     language=config["language"],
-                    provider=provider,
                     gtm_md=gtm_md,
                 )
                 publish({"type": "sim_final_report", "data": {"markdown": final_report_md}})

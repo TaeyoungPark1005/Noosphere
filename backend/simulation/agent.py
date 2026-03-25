@@ -39,7 +39,6 @@ async def react(
     idea_text: str,
     language: str = "English",
     neighbor_titles: list[str] | None = None,
-    provider: str = "openai",
 ) -> tuple[float, str]:
     interests = persona.interests
     if isinstance(interests, str):
@@ -66,7 +65,6 @@ async def react(
                 {"role": "user", "content": prompt},
             ],
             tier="low",
-            provider=provider,
             max_tokens=512,
             tools=[_REACT_TOOL],
             tool_choice="react_to_idea",

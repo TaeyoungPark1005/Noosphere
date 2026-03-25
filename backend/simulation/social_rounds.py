@@ -163,7 +163,6 @@ async def generate_seed_post(
     platform: AbstractPlatform,
     idea_text: str,
     language: str = "English",
-    provider: str = "openai",
 ) -> SocialPost:
     """Generate the initial post for a platform that kicks off discussion."""
     tool = _to_openai_tool(platform.seed_tool())
@@ -183,7 +182,6 @@ async def generate_seed_post(
                 {"role": "user", "content": prompt},
             ],
             tier="mid",
-            provider=provider,
             max_tokens=2048,
             tools=[tool],
             tool_choice=tool_name,
@@ -238,7 +236,6 @@ async def decide_action(
     platform: AbstractPlatform,
     feed_text: str,
     language: str = "English",
-    provider: str = "openai",
 ) -> AgentAction:
     """LLM call 1: decide action_type and target_post_id."""
     allowed = platform.get_allowed_actions(persona)
@@ -270,7 +267,6 @@ async def decide_action(
                 {"role": "user", "content": prompt},
             ],
             tier="low",
-            provider=provider,
             max_tokens=512,
             tools=[_DECIDE_ACTION_TOOL],
             tool_choice="decide_action",
@@ -297,7 +293,6 @@ async def generate_content(
     feed_text: str,
     idea_text: str,
     language: str = "English",
-    provider: str = "openai",
     cluster_docs_map: dict | None = None,
 ) -> tuple[str, dict]:
     """LLM call 2: generate post/comment text. Returns (content_str, structured_data)."""
@@ -330,7 +325,6 @@ async def generate_content(
                 {"role": "user", "content": prompt},
             ],
             tier="mid",
-            provider=provider,
             max_tokens=2048,
             tools=[tool],
             tool_choice=tool_name,
@@ -352,7 +346,6 @@ async def round_personas(
     idea_text: str,
     concurrency: int = 4,
     platform_name: str = "",
-    provider: str = "openai",
 ) -> AsyncGenerator[dict, None]:
     """Generate personas for all clusters for a specific platform. Yields sim_persona events."""
     sem = asyncio.Semaphore(concurrency)
@@ -365,7 +358,6 @@ async def round_personas(
                     cluster,
                     idea_text=idea_text,
                     platform_name=platform_name,
-                    provider=provider,
                 )
                 await queue.put({
                     "type": "sim_persona",
@@ -420,7 +412,6 @@ async def platform_round(
     round_num: int,
     language: str = "English",
     activation_rate: float = 0.25,
-    provider: str = "openai",
     cluster_docs_map: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
     """Run one round for a single platform. Yields streaming events."""
@@ -435,7 +426,7 @@ async def platform_round(
 
     for persona in active:
         feed_text = platform.build_feed(state)
-        action = await decide_action(persona, platform, feed_text, language, provider=provider)
+        action = await decide_action(persona, platform, feed_text, language)
 
         # Always generate content — votes/reactions are optional, but writing is mandatory
         allowed = platform.get_allowed_actions(persona)
@@ -447,7 +438,6 @@ async def platform_round(
         if content_actions:
             content, structured_data = await generate_content(
                 persona, action, platform, feed_text, idea_text, language,
-                provider=provider,
                 cluster_docs_map=cluster_docs_map,
             )
             post = SocialPost(
@@ -584,7 +574,6 @@ async def generate_report(
     idea_text: str,
     domain: str,
     language: str = "English",
-    provider: str = "openai",
 ) -> tuple[dict, str]:
     """Returns (report_json, report_md)."""
     platform_summaries = []
@@ -628,7 +617,6 @@ async def generate_report(
                 {"role": "user", "content": prompt},
             ],
             tier="high",
-            provider=provider,
             max_tokens=16384,
             timeout=300.0,
             tools=[_REPORT_TOOL],

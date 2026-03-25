@@ -38,7 +38,6 @@ async def generate_analysis_report(
     domain: str,
     input_text: str,
     language: str = "English",
-    provider: str = "openai",
 ) -> str:
     """
     RawItem 리스트로 경쟁 환경 분석 보고서를 생성합니다.
@@ -83,7 +82,6 @@ Respond entirely in {language}."""
             {"role": "user", "content": prompt},
         ],
         tier="high",
-        provider=provider,
         max_tokens=32768,
     )
     return response.content or ""
@@ -101,7 +99,6 @@ async def generate_gtm_report(
     analysis_md: str,
     input_text: str,
     language: str = "English",
-    provider: str = "openai",
 ) -> str:
     """
     시뮬레이션 결과(report_json)와 경쟁 분석(analysis_md)을 기반으로
@@ -175,7 +172,6 @@ Respond entirely in {language}. Be specific and actionable, not generic."""
             {"role": "user", "content": prompt},
         ],
         tier="high",
-        provider=provider,
         max_tokens=8192,
         timeout=300.0,
     )
@@ -212,7 +208,6 @@ async def generate_final_report(
     report_json: dict,
     input_text: str,
     language: str = "English",
-    provider: str = "openai",
     gtm_md: str = "",
 ) -> str:
     """
@@ -258,7 +253,6 @@ Be direct and actionable. Synthesize all available inputs. Respond entirely in {
             {"role": "user", "content": prompt},
         ],
         tier="high",
-        provider=provider,
         max_tokens=8192,
         timeout=300.0,
     )

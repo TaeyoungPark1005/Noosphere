@@ -134,7 +134,6 @@ async def run_simulation(
     language: str = "English",
     edges: list[dict] | None = None,
     activation_rate: float = 0.25,
-    provider: str = "openai",
     checkpoint: dict | None = None,
     seed_text: str | None = None,
 ) -> AsyncGenerator[dict, None]:
@@ -221,7 +220,6 @@ async def run_simulation(
                 async for event in round_personas(
                     clusters, idea_text,
                     platform_name=platform_name,
-                    provider=provider,
                 ):
                     persona = event.pop("_persona", None)
                     results.append((event, persona))
@@ -259,7 +257,7 @@ async def run_simulation(
         # Round 0: seed posts for each platform (parallel)
         platform_states: dict[str, PlatformState] = {}
         seed_tasks = {
-            p.name: asyncio.create_task(generate_seed_post(p, seed_idea, language, provider=provider))
+            p.name: asyncio.create_task(generate_seed_post(p, seed_idea, language))
             for p in active_platforms
         }
         for name, task in seed_tasks.items():
@@ -292,7 +290,6 @@ async def run_simulation(
                 return events_out
             async for event in platform_round(
                 plat, state, plat_personas, idea_text, rn, language, activation_rate,
-                provider=provider,
                 cluster_docs_map=cluster_docs_map,
             ):
                 events_out.append(event)
@@ -350,7 +347,7 @@ async def run_simulation(
     # Final report
     try:
         report_json, report_md = await generate_report(
-            list(platform_states.values()), idea_text, domain, language, provider=provider
+            list(platform_states.values()), idea_text, domain, language
         )
     except Exception as exc:
         logger.error("Report generation failed: %s", exc)

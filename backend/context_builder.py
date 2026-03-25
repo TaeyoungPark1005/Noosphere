@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from backend import llm
 
-async def detect_domain(input_text: str, provider: str = "openai") -> str:
+async def detect_domain(input_text: str) -> str:
     """Detect the product domain (e.g. 'SaaS', 'fintech', 'developer tools')."""
     prompt = (
         f"In 2-4 words, what is the domain of this product? "
@@ -13,7 +13,6 @@ async def detect_domain(input_text: str, provider: str = "openai") -> str:
         response = await llm.complete(
             messages=[{"role": "user", "content": prompt}],
             tier="low",
-            provider=provider,
             max_tokens=512,
         )
         domain = (response.content or "").strip()

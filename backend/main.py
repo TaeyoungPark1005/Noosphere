@@ -165,8 +165,6 @@ class SimConfig(BaseModel):
     platforms: list[str] = ["hackernews", "producthunt", "indiehackers", "reddit_startups", "linkedin"]
     activation_rate: float = 0.25
     source_limits: dict[str, int] = {}
-    provider: str = "openai"
-
     @field_validator("input_text")
     @classmethod
     def text_not_empty(cls, v: str) -> str:
@@ -190,13 +188,6 @@ class SimConfig(BaseModel):
     @classmethod
     def agents_valid(cls, v: int) -> int:
         return max(1, min(v, 150))
-
-    @field_validator("provider")
-    @classmethod
-    def provider_valid(cls, v: str) -> str:
-        if v not in {"openai", "anthropic", "gemini"}:
-            raise ValueError("provider must be openai, anthropic, or gemini")
-        return v
 
 
 @app.get("/health")

@@ -6,10 +6,7 @@ import os
 from dataclasses import dataclass
 from typing import Literal
 
-import anthropic as _anthropic
 import openai
-from google import genai as _genai
-from google.api_core import exceptions as _google_exceptions
 from backend.simulation.rate_limiter import acquire_api_slot, acquire_tpm_slot, record_token_usage
 
 logger = logging.getLogger(__name__)
@@ -17,28 +14,18 @@ logger = logging.getLogger(__name__)
 LLMTier = Literal["high", "mid", "low"]
 
 _MODELS: dict[str, dict[str, str]] = {
-    "openai":    {"high": "gpt-5.4",        "mid": "gpt-5.4-mini",       "low": "gpt-5.4-nano"},
-    "anthropic": {"high": "claude-opus-4-6", "mid": "claude-sonnet-4-6",  "low": "claude-haiku-4-5-20251001"},
-    "gemini":    {"high": "gemini-2.5-pro",  "mid": "gemini-2.5-flash",   "low": "gemini-2.5-flash-lite"},
+    "openai": {"high": "gpt-5.4", "mid": "gpt-5.4-mini", "low": "gpt-5.4-nano"},
 }
 
 # Maximum output tokens per model
 _MODEL_MAX_TOKENS: dict[str, int] = {
-    "gpt-5.4":                    32768,
-    "gpt-5.4-mini":               16384,
-    "gpt-5.4-nano":                8192,
-    "claude-opus-4-6":           128000,
-    "claude-sonnet-4-6":          64000,
-    "claude-haiku-4-5-20251001":   8192,
-    "gemini-2.5-pro":             65536,
-    "gemini-2.5-flash":           32768,
-    "gemini-2.5-flash-lite":      16384,
+    "gpt-5.4":      32768,
+    "gpt-5.4-mini": 16384,
+    "gpt-5.4-nano":  8192,
 }
 
 _API_KEY_NAMES: dict[str, str] = {
-    "openai":    "OPENAI_API_KEY",
-    "anthropic": "ANTHROPIC_API_KEY",
-    "gemini":    "GEMINI_API_KEY",
+    "openai": "OPENAI_API_KEY",
 }
 
 
@@ -58,7 +45,7 @@ class LLMRateLimitError(Exception):
     """Wraps each provider's rate limit exception."""
 
 
-def check_provider_key(provider: str) -> None:
+def check_provider_key(provider: str = "openai") -> None:
     """Raises ValueError if the required API key env var is not set."""
     key_name = _API_KEY_NAMES.get(provider)
     if key_name is None:
@@ -70,27 +57,20 @@ def check_provider_key(provider: str) -> None:
 async def complete(
     messages: list[dict],
     tier: LLMTier,
-    provider: str,
-    max_tokens: int,
+    provider: str = "openai",
+    max_tokens: int = 8192,
     timeout: float = 120.0,
     tools: list[dict] | None = None,
     tool_choice: str | None = None,
     response_format: dict | None = None,
 ) -> LLMResponse:
-    """Route LLM call to the appropriate provider."""
-    check_provider_key(provider)
-    model = _MODELS[provider][tier]
+    """Call OpenAI."""
+    check_provider_key("openai")
+    model = _MODELS["openai"][tier]
     model_max = _MODEL_MAX_TOKENS.get(model)
     if model_max is not None:
         max_tokens = min(max_tokens, model_max)
-
-    if provider == "openai":
-        return await _complete_openai(messages, model, max_tokens, timeout, tools, tool_choice, response_format)
-    if provider == "anthropic":
-        return await _complete_anthropic(messages, model, max_tokens, timeout, tools, tool_choice)
-    if provider == "gemini":
-        return await _complete_gemini(messages, model, max_tokens, timeout, tools, tool_choice)
-    raise ValueError(f"Unknown provider: {provider!r}")
+    return await _complete_openai(messages, model, max_tokens, timeout, tools, tool_choice, response_format)
 
 
 _openai_client: openai.AsyncOpenAI | None = None
@@ -172,284 +152,5 @@ async def _complete_openai(
             await asyncio.sleep(wait)
         except Exception:
             await record_token_usage("openai", actual_tokens=0, reservation_id=reservation_id)
-            raise
-    raise RuntimeError("Unreachable")
-
-
-_anthropic_client: _anthropic.AsyncAnthropic | None = None
-
-
-def _get_anthropic_client() -> _anthropic.AsyncAnthropic:
-    global _anthropic_client
-    if _anthropic_client is None:
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        _anthropic_client = _anthropic.AsyncAnthropic(api_key=api_key, timeout=None)
-    return _anthropic_client
-
-
-def _to_anthropic_tools(tools: list[dict]) -> list[dict]:
-    """Convert OpenAI-format tools to Anthropic format."""
-    result = []
-    for t in tools:
-        fn = t["function"]
-        result.append({
-            "name": fn["name"],
-            "description": fn.get("description", ""),
-            "input_schema": fn["parameters"],
-        })
-    return result
-
-
-def _tool_choice_anthropic(tool_choice: str | None) -> dict:
-    if tool_choice is None:
-        return {"type": "auto"}
-    return {"type": "tool", "name": tool_choice}
-
-
-def _extract_anthropic_response(response, tool_choice: str | None) -> LLMResponse:
-    tokens_used: int | None = None
-    try:
-        tokens_used = response.usage.input_tokens + response.usage.output_tokens
-    except AttributeError:
-        pass
-    tool_block = next(
-        (b for b in response.content if isinstance(b, _anthropic.types.ToolUseBlock)),
-        None
-    )
-    if tool_block is not None:
-        return LLMResponse(
-            content=None,
-            tool_name=tool_block.name,
-            tool_args=dict(tool_block.input),
-            tokens_used=tokens_used,
-        )
-    if tool_choice is not None:
-        raise LLMToolRequired(f"Expected tool call '{tool_choice}' but got none")
-    text_block = next(
-        (b for b in response.content if isinstance(b, _anthropic.types.TextBlock)),
-        None
-    )
-    return LLMResponse(
-        content=text_block.text if text_block else None,
-        tool_name=None,
-        tool_args=None,
-        tokens_used=tokens_used,
-    )
-
-
-async def _complete_anthropic(
-    messages: list[dict],
-    model: str,
-    max_tokens: int,
-    timeout: float,
-    tools: list[dict] | None,
-    tool_choice: str | None,
-) -> LLMResponse:
-    client = _get_anthropic_client()
-
-    # Extract system messages; Anthropic uses a separate `system` param
-    system_parts = [m["content"] for m in messages if m.get("role") == "system"]
-    user_messages = [m for m in messages if m.get("role") != "system"]
-    system_str = "\n\n".join(system_parts) if system_parts else _anthropic.NOT_GIVEN
-
-    kwargs: dict = {
-        "model": model,
-        "max_tokens": max_tokens,
-        "system": system_str,
-        "messages": user_messages,
-    }
-    if tools:
-        kwargs["tools"] = _to_anthropic_tools(tools)
-        kwargs["tool_choice"] = _tool_choice_anthropic(tool_choice)
-
-    reservation_id = await acquire_tpm_slot("anthropic", max_tokens)
-
-    for attempt in range(4):
-        await acquire_api_slot("anthropic")
-        try:
-            response = await asyncio.wait_for(
-                client.messages.create(**kwargs),
-                timeout=timeout,
-            )
-            result = _extract_anthropic_response(response, tool_choice)
-            await record_token_usage("anthropic", actual_tokens=result.tokens_used or 0, reservation_id=reservation_id)
-            return result
-        except LLMToolRequired:
-            await record_token_usage("anthropic", actual_tokens=0, reservation_id=reservation_id)
-            raise
-        except _anthropic.RateLimitError:
-            if attempt == 3:
-                await record_token_usage("anthropic", actual_tokens=0, reservation_id=reservation_id)
-                raise LLMRateLimitError("Anthropic rate limit exceeded")
-            wait = 5 * (2 ** attempt)
-            logger.warning("Anthropic rate limit, retrying in %ds", wait)
-            await asyncio.sleep(wait)
-        except Exception:
-            await record_token_usage("anthropic", actual_tokens=0, reservation_id=reservation_id)
-            raise
-    raise RuntimeError("Unreachable")
-
-
-_gemini_client: _genai.Client | None = None
-
-
-def _get_gemini_client() -> _genai.Client:
-    global _gemini_client
-    if _gemini_client is None:
-        api_key = os.environ.get("GEMINI_API_KEY", "")
-        _gemini_client = _genai.Client(api_key=api_key)
-    return _gemini_client
-
-
-def _deep_strip_schema_keys(schema: dict) -> dict:
-    """Recursively remove additionalProperties/$schema and normalize types for Gemini.
-
-    Gemini SDK only accepts a single string type enum value, so nullable union
-    types like `["string", "null"]` are converted to `type: "string", nullable: true`.
-    """
-    _STRIP = {"additionalProperties", "$schema"}
-    result = {}
-    for k, v in schema.items():
-        if k in _STRIP:
-            continue
-        if k == "type" and isinstance(v, list):
-            # Convert JSON Schema union type e.g. ["string", "null"] → type + nullable
-            non_null = [t for t in v if t != "null"]
-            result["type"] = non_null[0] if non_null else "string"
-            if "null" in v:
-                result["nullable"] = True
-        elif isinstance(v, dict):
-            result[k] = _deep_strip_schema_keys(v)
-        elif isinstance(v, list):
-            result[k] = [_deep_strip_schema_keys(i) if isinstance(i, dict) else i for i in v]
-        else:
-            result[k] = v
-    return result
-
-
-def _to_gemini_tools(tools: list[dict]) -> list:
-    """Convert OpenAI-format tools to Gemini FunctionDeclarations."""
-    declarations = []
-    for t in tools:
-        fn = t["function"]
-        declarations.append(
-            _genai.types.FunctionDeclaration(
-                name=fn["name"],
-                description=fn.get("description", ""),
-                parameters=_deep_strip_schema_keys(fn["parameters"]),
-            )
-        )
-    return [_genai.types.Tool(function_declarations=declarations)]
-
-
-def _rewrite_system_for_gemini(messages: list[dict]) -> list[dict]:
-    """Convert role='system' messages to user+model pairs for Gemini.
-
-    Also maps 'assistant' → 'model' and 'tool' → 'user' since Gemini only
-    accepts 'user' and 'model' roles.
-    """
-    _ROLE_MAP = {"assistant": "model", "tool": "user"}
-    result = []
-    for m in messages:
-        if m.get("role") == "system":
-            result.append({"role": "user", "content": m["content"]})
-            result.append({"role": "model", "content": "Understood."})
-        else:
-            role = _ROLE_MAP.get(m.get("role", "user"), m.get("role", "user"))
-            result.append({"role": role, "content": m["content"]})
-    return result
-
-
-def _to_gemini_contents(messages: list[dict]) -> list:
-    """Convert message dicts to Gemini Content objects."""
-    contents = []
-    for m in _rewrite_system_for_gemini(messages):
-        contents.append(_genai.types.Content(
-            role=m["role"],
-            parts=[_genai.types.Part.from_text(text=m["content"])],
-        ))
-    return contents
-
-
-def _extract_gemini_response(response, tool_choice: str | None) -> LLMResponse:
-    tokens_used: int | None = None
-    try:
-        tokens_used = response.usage_metadata.total_token_count
-    except AttributeError:
-        pass
-    # Look for function_call in parts
-    try:
-        parts = response.candidates[0].content.parts
-        for part in parts:
-            fc = getattr(part, "function_call", None)
-            if fc is not None and fc.name:
-                return LLMResponse(
-                    content=None,
-                    tool_name=fc.name,
-                    tool_args=dict(fc.args),
-                    tokens_used=tokens_used,
-                )
-    except (IndexError, AttributeError):
-        pass
-    if tool_choice is not None:
-        raise LLMToolRequired(f"Expected tool call '{tool_choice}' but got none")
-    return LLMResponse(content=response.text, tool_name=None, tool_args=None, tokens_used=tokens_used)
-
-
-async def _complete_gemini(
-    messages: list[dict],
-    model: str,
-    max_tokens: int,
-    timeout: float,
-    tools: list[dict] | None,
-    tool_choice: str | None,
-) -> LLMResponse:
-    client = _get_gemini_client()
-    contents = _to_gemini_contents(messages)
-
-    gemini_tools = _to_gemini_tools(tools) if tools else None
-    tool_config = None
-    if tools:
-        mode = "ANY" if tool_choice else "AUTO"
-        tool_config = _genai.types.ToolConfig(
-            functionCallingConfig=_genai.types.FunctionCallingConfig(
-                mode=mode,
-                allowedFunctionNames=[tool_choice] if tool_choice else None,
-            )
-        )
-    config = _genai.types.GenerateContentConfig(
-        maxOutputTokens=max_tokens,
-        tools=gemini_tools,
-        toolConfig=tool_config,
-    )
-
-    reservation_id = await acquire_tpm_slot("gemini", max_tokens)
-
-    for attempt in range(4):
-        await acquire_api_slot("gemini")
-        try:
-            response = await asyncio.wait_for(
-                client.aio.models.generate_content(
-                    model=model,
-                    contents=contents,
-                    config=config,
-                ),
-                timeout=timeout,
-            )
-            result = _extract_gemini_response(response, tool_choice)
-            await record_token_usage("gemini", actual_tokens=result.tokens_used or 0, reservation_id=reservation_id)
-            return result
-        except LLMToolRequired:
-            await record_token_usage("gemini", actual_tokens=0, reservation_id=reservation_id)
-            raise
-        except _google_exceptions.ResourceExhausted:
-            if attempt == 3:
-                await record_token_usage("gemini", actual_tokens=0, reservation_id=reservation_id)
-                raise LLMRateLimitError("Gemini rate limit exceeded")
-            wait = 5 * (2 ** attempt)
-            logger.warning("Gemini rate limit, retrying in %ds", wait)
-            await asyncio.sleep(wait)
-        except Exception:
-            await record_token_usage("gemini", actual_tokens=0, reservation_id=reservation_id)
             raise
     raise RuntimeError("Unreachable")
