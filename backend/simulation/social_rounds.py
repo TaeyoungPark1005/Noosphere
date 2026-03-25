@@ -7,7 +7,7 @@ import uuid
 from collections.abc import AsyncGenerator
 
 from backend.simulation.models import Persona, SocialPost, PlatformState
-from backend.simulation.persona_generator import generate_persona
+from backend.simulation.persona_generator import generate_persona, sample_persona_names
 from backend.simulation.platforms.base import AbstractPlatform, AgentAction
 from backend.simulation.taxonomy import coerce_string_list as _coerce_string_list
 from backend import llm
@@ -294,6 +294,7 @@ async def generate_content(
     idea_text: str,
     language: str = "English",
     cluster_docs_map: dict | None = None,
+    persona_history: list | None = None,
 ) -> tuple[str, dict]:
     """LLM call 2: generate post/comment text. Returns (content_str, structured_data)."""
     tool = _to_openai_tool(platform.content_tool(action.action_type))
@@ -301,6 +302,17 @@ async def generate_content(
     prior_knowledge = ""
     if cluster_docs_map is not None:
         prior_knowledge = _build_prior_knowledge(persona.node_id, cluster_docs_map, persona)
+    history_section = ""
+    if persona_history:
+        lines = [
+            f'- [Round {p.round_num}] "{p.content[:200].replace(chr(10), " ")}"'
+            for p in persona_history
+        ]
+        history_section = (
+            "Your previous comments in this discussion (do NOT repeat the same points — "
+            "build on, evolve, or take a new angle instead):\n"
+            + "\n".join(lines) + "\n\n"
+        )
     prompt = (
         f"Platform: {platform.name}\n"
         f"You are {persona.name}, {persona.role} at {persona.company} "
@@ -313,6 +325,7 @@ async def generate_content(
         f"IMPORTANT: You are NOT the creator of the idea below. You are a third-party community member reacting to someone else's product pitch.\n"
         f"Someone else's idea being discussed: {idea_text}\n\n"
         + (f"Your domain knowledge:\n{prior_knowledge}\n\n" if prior_knowledge else "")
+        + history_section
         + f"{feed_text}\n\n"
         f"Write your {action.action_type} in {language}. Be authentic to your persona and the platform style. Do NOT claim to be the founder or creator of this idea. "
         f"If replying to a comment, directly address what that person said — agree, push back, or add nuance. "
@@ -350,14 +363,16 @@ async def round_personas(
     """Generate personas for all clusters for a specific platform. Yields sim_persona events."""
     sem = asyncio.Semaphore(concurrency)
     queue: asyncio.Queue = asyncio.Queue()
+    assigned_names = sample_persona_names(len(clusters))
 
-    async def process_one(cluster: dict) -> None:
+    async def process_one(cluster: dict, assigned_name: str) -> None:
         async with sem:
             try:
                 persona = await generate_persona(
                     cluster,
                     idea_text=idea_text,
                     platform_name=platform_name,
+                    assigned_name=assigned_name,
                 )
                 await queue.put({
                     "type": "sim_persona",
@@ -388,7 +403,7 @@ async def round_personas(
             finally:
                 await queue.put(None)
 
-    tasks = [asyncio.create_task(process_one(c)) for c in clusters]
+    tasks = [asyncio.create_task(process_one(c, assigned_names[i])) for i, c in enumerate(clusters)]
     try:
         remaining = len(tasks)
         while remaining > 0:
@@ -426,6 +441,7 @@ async def platform_round(
 
     for persona in active:
         feed_text = platform.build_feed(state)
+        persona_history = [p for p in state.posts if p.author_node_id == persona.node_id]
         action = await decide_action(persona, platform, feed_text, language)
 
         # Always generate content — votes/reactions are optional, but writing is mandatory
@@ -439,6 +455,7 @@ async def platform_round(
             content, structured_data = await generate_content(
                 persona, action, platform, feed_text, idea_text, language,
                 cluster_docs_map=cluster_docs_map,
+                persona_history=persona_history or None,
             )
             post = SocialPost(
                 id=str(uuid.uuid4()),

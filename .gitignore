@@ -61,5 +61,10 @@ logs/
 .playwright-mcp/
 .superpowers/
 
+# Internal documentation & local config
+docs/
+.claude/
+marketing/
+
 # Cloud overlay symlink (local dev only — points to noosphere-cloud/overrides)
 backend/cloud
