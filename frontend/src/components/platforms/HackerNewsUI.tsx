@@ -17,7 +17,6 @@ export function HackerNewsUI({ posts }: Props) {
       }}>
         <div style={{ color: '#828282', fontSize: 11, marginBottom: 3 }}>
           <span style={{ color: '#828282', textDecoration: 'underline', cursor: 'pointer' }}>{reply.author_name}</span>
-          {' '}· {reply.upvotes} points
         </div>
         <div style={{ color: '#2a2a2a', lineHeight: 1.5, fontSize: 13 }}>{reply.content}</div>
         {renderReplies(reply.id, depth + 1, baseDelay + (ri + 1) * 80)}

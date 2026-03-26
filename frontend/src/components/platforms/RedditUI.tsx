@@ -1,6 +1,8 @@
 import type { SocialPost } from '../../types'
 import { getThreadedPosts } from './threadUtils'
 
+const REDDIT_THREAD_COLORS = ['#0045ac', '#00a500', '#e57f00', '#ca0000', '#9400d3', '#007d7d']
+
 interface Props { posts: SocialPost[] }
 
 export function RedditUI({ posts }: Props) {
@@ -11,7 +13,7 @@ export function RedditUI({ posts }: Props) {
     if (replies.length === 0) return null
     return replies.map((reply, ri) => (
       <div key={reply.id} className="post-item" style={{
-        borderLeft: '2px solid #edeff1',
+        borderLeft: `2px solid ${REDDIT_THREAD_COLORS[(depth - 1) % REDDIT_THREAD_COLORS.length]}`,
         paddingLeft: 10,
         marginLeft: Math.min((depth - 1) * 12, 36),
         marginBottom: 8,

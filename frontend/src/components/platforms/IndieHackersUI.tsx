@@ -45,7 +45,13 @@ export function IndieHackersUI({ posts }: Props) {
         borderBottom: '2px solid #e0e0e0', padding: '10px 16px',
         display: 'flex', alignItems: 'center', gap: 8,
       }}>
-        <span style={{ fontSize: 20 }}>🤠</span>
+        <div style={{
+          width: 24, height: 24, borderRadius: 4,
+          background: '#0cce6b',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 10, fontWeight: 900, color: '#fff',
+          flexShrink: 0,
+        }}>IH</div>
         <span style={{ fontWeight: 800, fontSize: 15, color: '#1f2d3d' }}>Indie Hackers</span>
         <span style={{ color: '#8492a6', fontSize: 12, marginLeft: 4 }}>/ discussions</span>
       </div>
