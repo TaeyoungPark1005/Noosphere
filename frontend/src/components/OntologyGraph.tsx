@@ -473,6 +473,7 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
           height={300}
           warmupTicks={120}
           cooldownTicks={0}
+          minZoom={0.6}
           onEngineStop={handleEngineStop}
           nodeId="id"
           nodeLabel={(node: unknown) => isGraphNode(node) ? `${node.name} · ${node.type}` : ''}
@@ -686,6 +687,7 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
         height={520}
         warmupTicks={200}
         cooldownTicks={0}
+        minZoom={0.6}
         onEngineStop={handleEngineStop}
         nodeId="id"
         nodeLabel={(node: unknown) => isContextRenderNode(node) ? `${node.title}\n${node.source}` : ''}
