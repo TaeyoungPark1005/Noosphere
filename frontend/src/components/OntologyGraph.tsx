@@ -381,13 +381,13 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
     if (!fg || graphData.nodes.length === 0) return
     let cancelled = false
 
-    fg.d3Force('cluster', makeClusterForce(graphData.nodes, compOf, 0.3))
-    fg.d3Force('charge')?.strength(-180)
-    fg.d3Force('link')?.distance(60)
+    fg.d3Force('cluster', makeClusterForce(graphData.nodes, compOf, 0.08))
+    fg.d3Force('charge')?.strength(-350)
+    fg.d3Force('link')?.distance(100)
 
     import('d3-force-3d').then(({ forceCollide }) => {
       if (cancelled) return
-      fg.d3Force('collide', forceCollide(28))
+      fg.d3Force('collide', forceCollide(42))
       fg.d3ReheatSimulation()
     })
     return () => {
@@ -480,6 +480,8 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
           nodeColor={(node: unknown) => isGraphNode(node) ? getNodeColor(node) : '#94a3b8'}
           nodeRelSize={6}
           linkColor={(link: unknown) => isGraphLink(link) ? getLinkColor(link) : '#cbd5e1'}
+          linkWidth={2}
+          linkCurvature={0.25}
           linkDirectionalArrowLength={6}
           linkDirectionalArrowRelPos={1}
           linkLineDash={(link: unknown) => isGraphLink(link) && EDGE_DASHED[link.type] ? [4, 2] : null}
@@ -592,15 +594,15 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
     if (!fg || graphData.nodes.length === 0) return
     let cancelled = false
 
-    fg.d3Force('charge')?.strength(-400)
+    fg.d3Force('charge')?.strength(-700)
     fg.d3Force('link')?.distance((link: ContextRenderLink) =>
-      200 - normalizeWeight(link) * 140  // 8→200px, 30+→60px
+      260 - normalizeWeight(link) * 180  // 8→260px, 30+→80px
     )
-    fg.d3Force('cluster', makeClusterForce(graphData.nodes, compOf, 0.25))
+    fg.d3Force('cluster', makeClusterForce(graphData.nodes, compOf, 0.06))
 
     import('d3-force-3d').then(({ forceCollide }) => {
       if (cancelled) return
-      fg.d3Force('collide', forceCollide(50))
+      fg.d3Force('collide', forceCollide(65))
       fg.d3ReheatSimulation()
     })
     return () => {
@@ -628,8 +630,8 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
 
   const getLinkWidth = useCallback((link: ContextRenderLink) => {
     const key = `${getEndpointId(link.source)}→${getEndpointId(link.target)}`
-    if (hoveredLink?.key === key) return 2.5
-    return 0.5 + normalizeWeight(link) * 1.5            // 0.5 ~ 2.0
+    if (hoveredLink?.key === key) return 4
+    return 1.5 + normalizeWeight(link) * 2              // 1.5 ~ 3.5
   }, [hoveredLink])
 
   const handleLinkHover = useCallback((link: ContextRenderLink | null) => {
@@ -695,6 +697,7 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
         nodeRelSize={5}
         linkColor={(link: unknown) => isContextRenderLink(link) ? getLinkColor(link) : 'rgba(148,163,184,0.3)'}
         linkWidth={(link: unknown) => isContextRenderLink(link) ? getLinkWidth(link) : 1}
+        linkCurvature={0.25}
         onLinkHover={(link: unknown) => handleLinkHover(isContextRenderLink(link) ? link : null)}
         onNodeClick={(node: unknown) => {
           if (isContextRenderNode(node)) handleNodeClick(node)
