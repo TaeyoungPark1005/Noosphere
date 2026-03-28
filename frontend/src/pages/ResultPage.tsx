@@ -5,6 +5,8 @@ import { ReportView } from '../components/ReportView'
 import { DetailsView } from '../components/DetailsView'
 import { MarkdownView } from '../components/MarkdownView'
 import { SourcesView } from '../components/SourcesView'
+import { SimulationAnalytics } from '../components/SimulationAnalytics'
+import { TopPosts } from '../components/TopPosts'
 import { getResults, exportPdfUrl } from '../api'
 import { VERDICT_CONFIG } from '../constants'
 import type { SimResults } from '../types'
@@ -135,7 +137,16 @@ export function ResultPage() {
                 </div>
               )}
               {tab === 'simulation' && (
-                <ReportView report={results.report_json} />
+                <div>
+                  <ReportView report={results.report_json} />
+                  <SimulationAnalytics
+                    posts={results.posts_json}
+                    report={results.report_json}
+                  />
+                  <div style={{ marginTop: 16 }}>
+                    <TopPosts posts={results.posts_json} />
+                  </div>
+                </div>
               )}
               {tab === 'launch' && (
                 <MarkdownView content={results.gtm_md || '_Launch strategy not yet available._'} />
