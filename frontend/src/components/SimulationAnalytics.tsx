@@ -73,7 +73,7 @@ export function SimulationAnalytics({ posts, report }: Props) {
       .sort((a, b) => b.count - a.count)
   }, [posts])
 
-  const hasData = sentimentData.length > 0 || criticismData.length > 0 || roundData.length > 0
+  const hasData = sentimentData.length > 0 || criticismData.length > 0 || roundData.length > 0 || platformData.length > 0
 
   if (!hasData) return null
 
