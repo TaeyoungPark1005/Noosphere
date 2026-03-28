@@ -138,12 +138,12 @@ export function ResultPage() {
               )}
               {tab === 'simulation' && (
                 <div>
-                  <ReportView report={results.report_json} />
                   <SimulationAnalytics
                     posts={results.posts_json}
                     report={results.report_json}
                   />
-                  <div style={{ marginTop: 16 }}>
+                  <ReportView report={results.report_json} />
+                  <div style={{ marginTop: 24 }}>
                     <TopPosts posts={results.posts_json} />
                   </div>
                 </div>
