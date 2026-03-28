@@ -32,13 +32,17 @@ export function SimulationAnalytics({ posts, report }: Props) {
   )
 
   // 감성 도넛 데이터
+  const SENTIMENT_ORDER = ['positive', 'neutral', 'negative']
+
   const sentimentData = useMemo(() => {
     if (!report?.segments) return []
     const counts: Record<string, number> = {}
     for (const seg of report.segments) {
       counts[seg.sentiment] = (counts[seg.sentiment] ?? 0) + 1
     }
-    return Object.entries(counts).map(([name, value]) => ({ name, value }))
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => SENTIMENT_ORDER.indexOf(a.name) - SENTIMENT_ORDER.indexOf(b.name))
   }, [report])
 
   // Criticism 비중 데이터
@@ -105,7 +109,7 @@ export function SimulationAnalytics({ posts, report }: Props) {
                         <Cell key={entry.name} fill={SENTIMENT_COLORS[entry.name] ?? '#94a3b8'} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: any) => value} />
+                    <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
