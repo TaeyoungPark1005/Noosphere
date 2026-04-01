@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  LineChart, Line,
 } from 'recharts'
 import type { Platform, SocialPost, ReportJSON } from '../types'
 import { PLATFORM_COLORS } from '../constants'
@@ -86,7 +87,42 @@ export function SimulationAnalytics({ posts, report }: Props) {
       .sort((a, b) => b.avgLen - a.avgLen)
   }, [posts])
 
+  // Praise clusters
+  const praiseData = useMemo(() => {
+    if (!report?.praise_clusters) return []
+    return [...report.praise_clusters]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6)
+      .map(c => ({
+        name: c.theme.length > 22 ? c.theme.slice(0, 20) + '\u2026' : c.theme,
+        fullName: c.theme,
+        count: c.count,
+        examples: c.examples,
+      }))
+  }, [report])
+
+  // Platform reception stacked bar data
+  const platformReceptionData = useMemo(() => {
+    if (!report?.platform_summaries) return []
+    const entries = Object.entries(report.platform_summaries)
+    if (entries.length < 2) return []
+    return entries.map(([name, data]) => ({
+      name: (PLATFORM_SHORT_LABELS as Record<string, string>)[name] ?? name,
+      positive: data.total > 0 ? Math.round(data.positive / data.total * 100) : 0,
+      neutral: data.total > 0 ? Math.round(data.neutral / data.total * 100) : 0,
+      negative: data.total > 0 ? Math.round(data.negative / data.total * 100) : 0,
+    }))
+  }, [report])
+
+  // Sentiment over rounds timeline
+  const timelineData = useMemo(() => {
+    if (!report?.sentiment_timeline) return []
+    if (report.sentiment_timeline.length < 2) return []
+    return report.sentiment_timeline
+  }, [report])
+
   const hasData = sentimentData.length > 0 || criticismData.length > 0 || platformDepthData.length > 0
+    || praiseData.length > 0 || platformReceptionData.length > 0 || timelineData.length > 0
 
   if (!hasData) return null
 
@@ -196,6 +232,86 @@ export function SimulationAnalytics({ posts, report }: Props) {
                   ))}
                 </Bar>
               </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* What People Loved (praise clusters) */}
+        {praiseData.length > 0 && (
+          <div style={{ background: '#fff', border: '1px solid #dcfce7', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
+              What People Loved
+            </p>
+            <ResponsiveContainer width="100%" height={Math.max(120, praiseData.length * 36)}>
+              <BarChart data={praiseData} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={140}
+                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip
+                  cursor={{ fill: '#f0fdf4' }}
+                  formatter={(v) => [v, 'mentions']}
+                  labelFormatter={(label) => {
+                    const item = praiseData.find(c => c.name === label)
+                    return item?.fullName ?? label
+                  }}
+                />
+                <Bar dataKey="count" fill="#22c55e" radius={[0, 3, 3, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Platform Reception (stacked bar) */}
+        {platformReceptionData.length > 0 && (
+          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
+              Platform Reception
+            </p>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={platformReceptionData} margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} unit="%" />
+                <Tooltip formatter={(v, name) => [`${v}%`, SENTIMENT_LABELS[name as string] ?? name]} />
+                <Legend
+                  formatter={(value) => SENTIMENT_LABELS[value as string] ?? value}
+                  wrapperStyle={{ fontSize: 11 }}
+                />
+                <Bar dataKey="positive" stackId="a" fill="#22c55e" />
+                <Bar dataKey="neutral" stackId="a" fill="#94a3b8" />
+                <Bar dataKey="negative" stackId="a" fill="#ef4444" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Sentiment Over Rounds (line chart) */}
+        {timelineData.length > 0 && (
+          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
+              Sentiment Over Rounds
+            </p>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={timelineData} margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="round" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} label={{ value: 'Round', position: 'insideBottomRight', offset: -5, style: { fontSize: 10, fill: '#94a3b8' } }} />
+                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip formatter={(v, name) => [v, SENTIMENT_LABELS[name as string] ?? name]} />
+                <Legend
+                  formatter={(value) => SENTIMENT_LABELS[value as string] ?? value}
+                  wrapperStyle={{ fontSize: 11 }}
+                />
+                <Line type="monotone" dataKey="positive" stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="neutral" stroke="#94a3b8" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="negative" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         )}

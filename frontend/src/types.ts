@@ -59,12 +59,36 @@ export interface Improvement {
   frequency: number
 }
 
+export interface PraiseCluster {
+  theme: string
+  count: number
+  examples: string[]
+}
+
+export interface PlatformSentimentSummary {
+  positive: number
+  neutral: number
+  negative: number
+  verdict: string
+  total: number
+}
+
+export interface SentimentTimelineEntry {
+  round: number
+  positive: number
+  neutral: number
+  negative: number
+}
+
 export interface ReportJSON {
   verdict: 'positive' | 'mixed' | 'skeptical' | 'negative'
   evidence_count: number
   segments: ReportSegment[]
+  praise_clusters?: PraiseCluster[]
   criticism_clusters: CriticismCluster[]
   improvements: Improvement[]
+  platform_summaries?: Record<string, PlatformSentimentSummary>
+  sentiment_timeline?: SentimentTimelineEntry[]
 }
 
 export interface SourceItem {
