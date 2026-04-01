@@ -35,8 +35,13 @@ class LinkedIn(AbstractPlatform):
                             "minItems": 2,
                             "maxItems": 4,
                         },
+                        "sentiment": {
+                            "type": "string",
+                            "enum": ["positive", "neutral", "negative"],
+                            "description": "Overall sentiment of this content toward the idea/product",
+                        },
                     },
-                    "required": ["text", "business_insight", "hashtags"],
+                    "required": ["text", "business_insight", "hashtags", "sentiment"],
                 },
             }
         # comment
@@ -55,8 +60,13 @@ class LinkedIn(AbstractPlatform):
                         "enum": ["supportive", "critical", "neutral"],
                         "description": "Overall stance toward the idea.",
                     },
+                    "sentiment": {
+                        "type": "string",
+                        "enum": ["positive", "neutral", "negative"],
+                        "description": "Overall sentiment of this content toward the idea/product",
+                    },
                 },
-                "required": ["text", "stance"],
+                "required": ["text", "stance", "sentiment"],
             },
         }
 

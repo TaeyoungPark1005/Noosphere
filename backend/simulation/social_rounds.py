@@ -115,8 +115,22 @@ def select_active_agents(
         p for p in personas
         if current_round - speakers.get(p.node_id, -99) >= 3
     ]
-    random.shuffle(new_pool)
-    selected_new = new_pool[:k_new]
+    # Weighted selection: enthusiastic personas (high innovation_openness, low skepticism) participate more
+    weights = []
+    for p in new_pool:
+        w = (getattr(p, 'innovation_openness', 5) + (10 - getattr(p, 'skepticism', 5))) / 20.0
+        weights.append(max(0.1, w))  # minimum 0.1 to ensure all agents have a chance
+    selected_new = []
+    pool_copy = list(new_pool)
+    weights_copy = list(weights)
+    for _ in range(min(k_new, len(pool_copy))):
+        if not pool_copy:
+            break
+        chosen = random.choices(pool_copy, weights=weights_copy, k=1)[0]
+        idx = pool_copy.index(chosen)
+        selected_new.append(chosen)
+        pool_copy.pop(idx)
+        weights_copy.pop(idx)
     selected_ids = {p.node_id for p in selected_new}
 
     # NOTE: no surplus transfer — new-agent shortfall does NOT bleed into returning pool.
@@ -295,6 +309,7 @@ async def generate_content(
     language: str = "English",
     cluster_docs_map: dict | None = None,
     persona_history: list | None = None,
+    replies_to_me: list | None = None,
 ) -> tuple[str, dict]:
     """LLM call 2: generate post/comment text. Returns (content_str, structured_data)."""
     tool = _to_openai_tool(platform.content_tool(action.action_type))
@@ -313,6 +328,12 @@ async def generate_content(
             "build on, evolve, or take a new angle instead):\n"
             + "\n".join(lines) + "\n\n"
         )
+    replies_section = ""
+    if replies_to_me:
+        replies_section = "\nReplies to your previous comments (consider responding):\n"
+        for r in replies_to_me[-3:]:  # most recent 3 only
+            replies_section += f"- {r.author_name}: {r.content[:200]}\n"
+        replies_section += "\n"
     prompt = (
         f"Platform: {platform.name}\n"
         f"You are {persona.name}, {persona.role} at {persona.company} "
@@ -326,6 +347,7 @@ async def generate_content(
         f"Someone else's idea being discussed: {idea_text}\n\n"
         + (f"Your domain knowledge:\n{prior_knowledge}\n\n" if prior_knowledge else "")
         + history_section
+        + replies_section
         + f"{feed_text}\n\n"
         f"Write your {action.action_type} in {language}. Be authentic to your persona and the platform style. Do NOT claim to be the founder or creator of this idea. "
         f"If replying to a comment, directly address what that person said — agree, push back, or add nuance. "
@@ -442,6 +464,12 @@ async def platform_round(
     for persona in active:
         feed_text = platform.build_feed(state)
         persona_history = [p for p in state.posts if p.author_node_id == persona.node_id]
+        # Collect replies from other agents to this persona's posts
+        my_post_ids = {p.id for p in persona_history}
+        replies_to_me = [
+            p for p in state.posts
+            if p.parent_id in my_post_ids and p.author_node_id != persona.node_id
+        ]
         action = await decide_action(persona, platform, feed_text, language)
 
         # If the agent chose a vote/reaction action, apply it first
@@ -468,6 +496,7 @@ async def platform_round(
                 persona, content_action, platform, feed_text, idea_text, language,
                 cluster_docs_map=cluster_docs_map,
                 persona_history=persona_history or None,
+                replies_to_me=replies_to_me or None,
             )
             post = SocialPost(
                 id=str(uuid.uuid4()),
@@ -545,6 +574,26 @@ _REPORT_TOOL = {
                     "minItems": 5,
                     "maxItems": 5,
                 },
+                "praise_clusters": {
+                    "type": "array",
+                    "description": "Top recurring praise themes and what people liked",
+                    "minItems": 2,
+                    "maxItems": 4,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "theme": {"type": "string", "description": "What aspect people praised"},
+                            "count": {"type": "integer", "description": "Approximate number of positive mentions"},
+                            "examples": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "maxItems": 2,
+                                "description": "1-2 direct quote examples",
+                            },
+                        },
+                        "required": ["theme", "count", "examples"],
+                    },
+                },
                 "criticism_clusters": {
                     "type": "array",
                     "description": "Top 3-5 recurring objections or concerns",
@@ -579,7 +628,7 @@ _REPORT_TOOL = {
                     "maxItems": 5,
                 },
             },
-            "required": ["verdict", "evidence_count", "segments", "criticism_clusters", "improvements"],
+            "required": ["verdict", "evidence_count", "segments", "praise_clusters", "criticism_clusters", "improvements"],
         },
     },
 }
@@ -620,6 +669,7 @@ async def generate_report(
         + f"\n\nInstructions:\n"
         f"- verdict: overall market reception\n"
         f"- segments: include all 5 segment types even if some have neutral sentiment\n"
+        f"- praise_clusters: top 2-4 recurring praise themes\n"
         f"- criticism_clusters: top 3-5 recurring objections\n"
         f"- improvements: top 3-5 actionable suggestions\n"
         f"- All text fields must be in {language}"
@@ -649,9 +699,49 @@ async def generate_report(
             "verdict": "mixed",
             "evidence_count": total_evidence,
             "segments": [],
+            "praise_clusters": [],
             "criticism_clusters": [],
             "improvements": [],
         }
+
+    # ── Python-computed fields (not LLM-generated) ──────────────────────────
+
+    # Platform-level sentiment breakdown
+    platform_sentiment: dict[str, dict[str, object]] = {}
+    all_posts: list = []
+    for state in platform_states:
+        posts = state.posts
+        all_posts.extend(posts)
+        counts: dict[str, int] = {"positive": 0, "neutral": 0, "negative": 0}
+        for post in posts:
+            s = getattr(post, "sentiment", "") or ""
+            if s in counts:
+                counts[s] += 1
+        total = sum(counts.values())
+        if total > 0:
+            pv = (
+                "positive" if counts["positive"] > counts["negative"] and counts["positive"] > counts["neutral"]
+                else "negative" if counts["negative"] > counts["positive"] and counts["negative"] > counts["neutral"]
+                else "mixed"
+            )
+            platform_sentiment[state.platform_name] = {**counts, "verdict": pv, "total": total}
+    report_json["platform_summaries"] = platform_sentiment
+
+    # Round-level sentiment timeline
+    timeline_data: dict[int, dict[str, int]] = {}
+    for post in all_posts:
+        rn = getattr(post, "round_num", 0)
+        s = getattr(post, "sentiment", "") or "neutral"
+        if rn not in timeline_data:
+            timeline_data[rn] = {"positive": 0, "neutral": 0, "negative": 0}
+        if s in timeline_data[rn]:
+            timeline_data[rn][s] += 1
+    sentiment_timeline = [
+        {"round": rn, **counts}
+        for rn, counts in sorted(timeline_data.items())
+        if rn > 0
+    ]
+    report_json["sentiment_timeline"] = sentiment_timeline
 
     report_md = _render_report_md(report_json, idea_text, language)
     return report_json, report_md

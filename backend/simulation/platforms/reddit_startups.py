@@ -27,8 +27,13 @@ class RedditStartups(AbstractPlatform):
                         "type": ["string", "null"],
                         "description": "A specific counterargument or alternative perspective, or null if generally agreeable.",
                     },
+                    "sentiment": {
+                        "type": "string",
+                        "enum": ["positive", "neutral", "negative"],
+                        "description": "Overall sentiment of this content toward the idea/product",
+                    },
                 },
-                "required": ["text", "contrarian_point"],
+                "required": ["text", "contrarian_point", "sentiment"],
             },
         }
 

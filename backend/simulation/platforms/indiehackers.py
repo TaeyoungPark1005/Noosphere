@@ -32,8 +32,13 @@ class IndieHackers(AbstractPlatform):
                             "type": "string",
                             "description": "The key takeaway or lesson from your experience.",
                         },
+                        "sentiment": {
+                            "type": "string",
+                            "enum": ["positive", "neutral", "negative"],
+                            "description": "Overall sentiment of this content toward the idea/product",
+                        },
                     },
-                    "required": ["text", "mrr_context", "lesson"],
+                    "required": ["text", "mrr_context", "lesson", "sentiment"],
                 },
             }
         if action_type == "ask_advice":
@@ -51,8 +56,13 @@ class IndieHackers(AbstractPlatform):
                             "type": "string",
                             "description": "The focused, actionable question you need answered.",
                         },
+                        "sentiment": {
+                            "type": "string",
+                            "enum": ["positive", "neutral", "negative"],
+                            "description": "Overall sentiment of this content toward the idea/product",
+                        },
                     },
-                    "required": ["text", "specific_question"],
+                    "required": ["text", "specific_question", "sentiment"],
                 },
             }
         # comment
@@ -66,8 +76,13 @@ class IndieHackers(AbstractPlatform):
                         "type": "string",
                         "description": "Supportive, honest comment. 1-3 sentences.",
                     },
+                    "sentiment": {
+                        "type": "string",
+                        "enum": ["positive", "neutral", "negative"],
+                        "description": "Overall sentiment of this content toward the idea/product",
+                    },
                 },
-                "required": ["text"],
+                "required": ["text", "sentiment"],
             },
         }
 

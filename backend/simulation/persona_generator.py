@@ -77,6 +77,23 @@ _PLATFORM_AUDIENCE = {
 }
 
 
+import re as _re
+
+# Extract archetype lists from _PLATFORM_AUDIENCE for Python-controlled selection
+_PLATFORM_ARCHETYPES: dict[str, list[str]] = {}
+for _plat_key, _plat_desc in _PLATFORM_AUDIENCE.items():
+    # Find text between "Pick ONE of these archetypes" variants and the period that ends the list
+    _match = _re.search(
+        r"Pick ONE (?:of these archetypes|at random)[^:]*:\s*(.+?)(?:\.\s*They|\.\s*Mix|\.\s*Generate)",
+        _plat_desc,
+        _re.DOTALL,
+    )
+    if _match:
+        _raw = _match.group(1)
+        _archs = [a.strip().rstrip(".") for a in _raw.split(",") if a.strip()]
+        _PLATFORM_ARCHETYPES[_plat_key] = _archs
+
+
 _PERSONA_TOOL = {
     "type": "function",
     "function": {
@@ -336,6 +353,18 @@ async def generate_persona(
         platform_name,
         "A general online tech community. Generate a diverse persona appropriate to the idea's domain.",
     )
+
+    # Python-controlled archetype selection to prevent LLM bias toward "software engineer"
+    archetypes = _PLATFORM_ARCHETYPES.get(platform_name, [])
+    if archetypes:
+        selected_archetype = random.choice(archetypes)
+        # Replace "Pick ONE ... at random" instruction with a deterministic directive
+        platform_context = _re.sub(
+            r"Pick ONE (?:of these archetypes|at random)[^.]*\.",
+            f"You MUST generate a persona of archetype: {selected_archetype}.",
+            platform_context,
+        )
+
     system = _SYSTEM_TMPL.format(platform_context=platform_context)
 
     try:

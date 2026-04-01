@@ -55,8 +55,13 @@ class ProductHunt(AbstractPlatform):
                             "minItems": 1,
                             "maxItems": 3,
                         },
+                        "sentiment": {
+                            "type": "string",
+                            "enum": ["positive", "neutral", "negative"],
+                            "description": "Overall sentiment of this content toward the idea/product",
+                        },
                     },
-                    "required": ["text", "rating", "pros", "cons"],
+                    "required": ["text", "rating", "pros", "cons", "sentiment"],
                 },
             }
         if action_type == "ask_question":
@@ -70,8 +75,13 @@ class ProductHunt(AbstractPlatform):
                             "type": "string",
                             "description": "A genuine, specific question about the product.",
                         },
+                        "sentiment": {
+                            "type": "string",
+                            "enum": ["positive", "neutral", "negative"],
+                            "description": "Overall sentiment of this content toward the idea/product",
+                        },
                     },
-                    "required": ["text"],
+                    "required": ["text", "sentiment"],
                 },
             }
         if action_type == "maker_response":
@@ -89,8 +99,13 @@ class ProductHunt(AbstractPlatform):
                             "type": "string",
                             "description": "The specific concern or question this response is addressing.",
                         },
+                        "sentiment": {
+                            "type": "string",
+                            "enum": ["positive", "neutral", "negative"],
+                            "description": "Overall sentiment of this content toward the idea/product",
+                        },
                     },
-                    "required": ["text", "addresses_concern"],
+                    "required": ["text", "addresses_concern", "sentiment"],
                 },
             }
         # fallback

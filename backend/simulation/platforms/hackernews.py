@@ -26,8 +26,13 @@ class HackerNews(AbstractPlatform):
                         "type": "boolean",
                         "description": "True if this comment primarily asks a clarifying question.",
                     },
+                    "sentiment": {
+                        "type": "string",
+                        "enum": ["positive", "neutral", "negative"],
+                        "description": "Overall sentiment of this content toward the idea/product",
+                    },
                 },
-                "required": ["text", "is_question"],
+                "required": ["text", "is_question", "sentiment"],
             },
         }
 
