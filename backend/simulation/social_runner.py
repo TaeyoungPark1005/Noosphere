@@ -858,40 +858,49 @@ async def run_simulation(
 
     # Rounds start_round~num_rounds
     for round_num in range(start_round, num_rounds + 1):
+        event_queue: asyncio.Queue = asyncio.Queue()
+        _sentinel = object()
+
         async def run_platform_round(plat, rn=round_num):
-            events_out = []
-            state = platform_states.get(plat.name)
-            if state is None:
-                return events_out
-            plat_personas = platform_personas.get(plat.name) or []
-            if not plat_personas:
-                logger.warning("No personas for platform %s, skipping round %d", plat.name, rn)
-                return events_out
-            plat_rate = adjusted_rates.get(plat.name, activation_rate)
-            async for event in platform_round(
-                plat, state, plat_personas, idea_text, rn, language, plat_rate,
-                cluster_docs_map=cluster_docs_map,
-                total_rounds=num_rounds,
-                all_platform_states=platform_states,
-            ):
-                events_out.append(event)
-            return events_out
+            try:
+                state = platform_states.get(plat.name)
+                if state is None:
+                    return
+                plat_personas = platform_personas.get(plat.name) or []
+                if not plat_personas:
+                    logger.warning("No personas for platform %s, skipping round %d", plat.name, rn)
+                    return
+                plat_rate = adjusted_rates.get(plat.name, activation_rate)
+                async for event in platform_round(
+                    plat, state, plat_personas, idea_text, rn, language, plat_rate,
+                    cluster_docs_map=cluster_docs_map,
+                    total_rounds=num_rounds,
+                    all_platform_states=platform_states,
+                ):
+                    await event_queue.put(event)
+            except Exception as exc:
+                await event_queue.put(exc)
+            finally:
+                await event_queue.put(_sentinel)
 
-        results = await asyncio.gather(
-            *[run_platform_round(p) for p in active_platforms],
-            return_exceptions=True,
-        )
-
+        tasks = [asyncio.create_task(run_platform_round(p)) for p in active_platforms]
+        remaining = len(tasks)
         round_summary_stats: dict[str, dict] = {}
-        for result in results:
-            if isinstance(result, Exception):
-                logger.warning("Platform round failed: %s", result)
-                continue
-            for event in result:
-                if event["type"] == "__platform_round_done__":
-                    round_summary_stats[event["platform"]] = event["stats"]
-                else:
-                    yield event
+        exceptions: list[Exception] = []
+
+        while remaining > 0:
+            item = await event_queue.get()
+            if item is _sentinel:
+                remaining -= 1
+            elif isinstance(item, Exception):
+                logger.warning("Platform round failed: %s", item)
+                exceptions.append(item)
+            elif item["type"] == "__platform_round_done__":
+                round_summary_stats[item["platform"]] = item["stats"]
+            else:
+                yield item
+
+        await asyncio.gather(*tasks, return_exceptions=True)
 
         # Update per-platform activation rates from this round's dynamic adjustment
         for plat_name, stats in round_summary_stats.items():
@@ -908,7 +917,7 @@ async def run_simulation(
             if pname in round_summary_stats:
                 round_summary_stats[pname]["top_discussed_post_id"] = top_discussed
 
-        failed = sum(1 for r in results if isinstance(r, Exception))
+        failed = len(exceptions)
         if 0 < failed and failed * 2 <= len(active_platforms):
             yield {"type": "sim_warning",
                    "message": f"{failed} platform(s) failed this round but simulation continues"}
