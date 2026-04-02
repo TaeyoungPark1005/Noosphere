@@ -2,7 +2,6 @@ import { useMemo } from 'react'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList,
-  LineChart, Line,
 } from 'recharts'
 import type { Platform, SocialPost, ReportJSON, Persona } from '../types'
 
@@ -136,13 +135,6 @@ export function SimulationAnalytics({ posts, report, roundStats, personas, segme
     }))
   }, [report])
 
-  // Sentiment over rounds timeline
-  const timelineData = useMemo(() => {
-    if (!report?.sentiment_timeline) return []
-    if (report.sentiment_timeline.length < 2) return []
-    return report.sentiment_timeline
-  }, [report])
-
   // ── Persona demographics ────────────────────────────────────────────
   const allPersonas = useMemo(() => {
     if (!personas) return []
@@ -233,7 +225,7 @@ export function SimulationAnalytics({ posts, report, roundStats, personas, segme
   }, [report])
 
   const hasData = sentimentData.length > 0 || criticismData.length > 0
-    || praiseData.length > 0 || platformReceptionData.length > 0 || timelineData.length > 0
+    || praiseData.length > 0 || platformReceptionData.length > 0
     || hasPersonaData
     || phRatingsData.some(d => d.count > 0)
     || phProsConsData !== null
@@ -261,7 +253,7 @@ export function SimulationAnalytics({ posts, report, roundStats, personas, segme
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16, alignItems: 'start' }}>
 
         {/* Post-level Sentiment Distribution */}
         {sentimentData.length > 0 && (
@@ -508,54 +500,29 @@ export function SimulationAnalytics({ posts, report, roundStats, personas, segme
           </div>
         )}
 
-        {/* Sentiment Over Rounds (line chart) */}
-        {timelineData.length > 0 && (
-          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
-              Sentiment Over Rounds
-            </p>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={timelineData} margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="round" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} label={{ value: 'Round', position: 'insideBottomRight', offset: -5, style: { fontSize: 10, fill: '#94a3b8' } }} />
-                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip formatter={(v, name) => [v, SENTIMENT_LABELS[name as string] ?? name]} />
-                <Legend
-                  formatter={(value) => SENTIMENT_LABELS[value as string] ?? value}
-                  wrapperStyle={{ fontSize: 11 }}
-                />
-                <Line type="monotone" dataKey="positive" stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="neutral" stroke="#94a3b8" strokeWidth={2} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="negative" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="engagement" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="constructive" stroke="#06b6d4" strokeWidth={2} dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
+      </div>
 
-        {/* Participant Profile (persona demographics) */}
-        {hasPersonaData && (
-          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
+      {/* Participant Profile — full-width horizontal layout */}
+      {hasPersonaData && (
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 16 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 }}>
               Participant Profile
             </p>
+            <span style={{ fontSize: 20, fontWeight: 700, color: '#1e293b' }}>{allPersonas.length}</span>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>total participants</span>
+          </div>
 
-            {/* Total participants */}
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 16 }}>
-              <span style={{ fontSize: 28, fontWeight: 700, color: '#1e293b' }}>{allPersonas.length}</span>
-              <span style={{ fontSize: 12, color: '#94a3b8' }}>total participants</span>
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, alignItems: 'start' }}>
 
-            {/* Seniority distribution bar chart */}
+            {/* Seniority */}
             {seniorityData.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>Seniority Distribution</p>
-                <ResponsiveContainer width="100%" height={Math.max(100, seniorityData.length * 28)}>
+              <div>
+                <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>Seniority</p>
+                <ResponsiveContainer width="100%" height={seniorityData.length * 28}>
                   <BarChart data={seniorityData} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" width={72} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
                     <Tooltip cursor={{ fill: '#f8fafc' }} formatter={(v) => [v, 'count']} />
                     <Bar dataKey="count" fill="#8b5cf6" radius={[0, 3, 3, 0]} />
                   </BarChart>
@@ -563,32 +530,14 @@ export function SimulationAnalytics({ posts, report, roundStats, personas, segme
               </div>
             )}
 
-            {/* Affiliation top 5 */}
-            {topAffiliations.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>Top Affiliations</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {topAffiliations.map(a => (
-                    <span key={a.name} style={{
-                      fontSize: 11, padding: '3px 10px', borderRadius: 10,
-                      background: '#f1f5f9', color: '#475569', fontWeight: 500,
-                    }}>
-                      {a.name} ({a.count})
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* MBTI distribution bar chart */}
+            {/* MBTI */}
             {mbtiData.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>MBTI Distribution</p>
-                <ResponsiveContainer width="100%" height={Math.max(100, mbtiData.length * 28)}>
+              <div>
+                <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>MBTI</p>
+                <ResponsiveContainer width="100%" height={mbtiData.length * 28}>
                   <BarChart data={mbtiData} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <YAxis type="category" dataKey="name" width={50} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" width={48} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
                     <Tooltip cursor={{ fill: '#f8fafc' }} formatter={(v) => [v, 'count']} />
                     <Bar dataKey="count" fill="#06b6d4" radius={[0, 3, 3, 0]} />
                   </BarChart>
@@ -596,15 +545,14 @@ export function SimulationAnalytics({ posts, report, roundStats, personas, segme
               </div>
             )}
 
-            {/* Generation distribution bar chart */}
+            {/* Generation */}
             {generationData.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>Generation Distribution</p>
-                <ResponsiveContainer width="100%" height={Math.max(100, generationData.length * 28)}>
+              <div>
+                <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>Generation</p>
+                <ResponsiveContainer width="100%" height={generationData.length * 28}>
                   <BarChart data={generationData} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" width={72} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
                     <Tooltip cursor={{ fill: '#f8fafc' }} formatter={(v) => [v, 'count']} />
                     <Bar dataKey="count" fill="#f59e0b" radius={[0, 3, 3, 0]} />
                   </BarChart>
@@ -612,37 +560,47 @@ export function SimulationAnalytics({ posts, report, roundStats, personas, segme
               </div>
             )}
 
-            {/* Average traits — horizontal progress bars */}
+            {/* Affiliations */}
+            {topAffiliations.length > 0 && (
+              <div>
+                <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>Top Affiliations</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {topAffiliations.map(a => (
+                    <div key={a.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '75%' }}>{a.name}</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>{a.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Average Traits */}
             {avgTraits && (
               <div>
-                <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>Average Traits (1-10)</p>
+                <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>Avg Traits (1–10)</p>
                 {[
                   { label: 'Skepticism', value: avgTraits.skepticism, color: '#f59e0b' },
                   { label: 'Commercial Focus', value: avgTraits.commercial_focus, color: '#3b82f6' },
-                  { label: 'Innovation Openness', value: avgTraits.innovation_openness, color: '#22c55e' },
+                  { label: 'Innovation', value: avgTraits.innovation_openness, color: '#22c55e' },
                 ].map(t => (
                   <div key={t.label} style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3 }}>
                       <span style={{ color: '#64748b' }}>{t.label}</span>
-                      <span style={{ color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>{t.value.toFixed(1)}</span>
+                      <span style={{ color: '#94a3b8' }}>{t.value.toFixed(1)}</span>
                     </div>
-                    <div style={{ height: 6, borderRadius: 3, background: '#f1f5f9', overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%', borderRadius: 3,
-                        background: t.color,
-                        width: `${(t.value / 10) * 100}%`,
-                        transition: 'width 0.4s ease',
-                      }} />
+                    <div style={{ height: 5, borderRadius: 3, background: '#f1f5f9', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', borderRadius: 3, background: t.color, width: `${(t.value / 10) * 100}%` }} />
                     </div>
                   </div>
                 ))}
               </div>
             )}
+
           </div>
-        )}
+        </div>
+      )}
 
-
-      </div>
     </div>
   )
 }
