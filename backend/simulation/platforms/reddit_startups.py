@@ -4,7 +4,7 @@ from backend.simulation.models import SocialPost, PlatformState
 
 class RedditStartups(AbstractPlatform):
     name = "reddit_startups"
-    allowed_actions = ["comment", "reply", "upvote", "downvote", "new_post"]
+    allowed_actions = ["comment", "reply", "upvote", "downvote"]
     no_content_actions = {"upvote", "downvote"}
     seed_controversy_hint = "End with an open question inviting dissenting views from skeptical founders."
     system_prompt = (

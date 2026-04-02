@@ -4,7 +4,7 @@ from backend.simulation.models import SocialPost, PlatformState
 
 class HackerNews(AbstractPlatform):
     name = "hackernews"
-    allowed_actions = ["comment", "reply", "upvote", "flag", "ask_hn", "new_post"]
+    allowed_actions = ["comment", "reply", "upvote", "flag", "ask_hn"]
     no_content_actions = {"upvote", "flag"}
     _flag_penalty = 2  # flags carry stronger downvote penalty than regular downvotes
     seed_controversy_hint = "Include a debatable technical claim or tradeoff that experienced engineers might challenge."
