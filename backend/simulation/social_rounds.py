@@ -1355,6 +1355,43 @@ async def generate_content(
 
 # ── 페르소나 생성 라운드 ──────────────────────────────────────────────────────
 
+def _build_sim_persona_event(persona: "Persona", platform_name: str) -> dict:
+    """Build a sim_persona event dict from a Persona instance."""
+    return {
+        "type": "sim_persona",
+        "node_id": persona.node_id,
+        "platform": platform_name,
+        "persona": {
+            "name": persona.name,
+            "role": persona.role,
+            "age": persona.age,
+            "generation": persona.generation,
+            "seniority": persona.seniority,
+            "affiliation": persona.affiliation,
+            "company": persona.company,
+            "mbti": persona.mbti,
+            "interests": persona.interests,
+            "skepticism": persona.skepticism,
+            "commercial_focus": persona.commercial_focus,
+            "innovation_openness": persona.innovation_openness,
+            "source_title": persona.source_title,
+            "domain_type": persona.domain_type,
+            "tech_area": persona.tech_area,
+            "market": persona.market,
+            "problem_domain": persona.problem_domain,
+            "jtbd": persona.jtbd,
+            "cognitive_pattern": persona.cognitive_pattern,
+            "emotional_state": persona.emotional_state,
+            "region": getattr(persona, "region", ""),
+            "attitude_shift": getattr(persona, "attitude_shift", 0.0),
+            "attitude_history": getattr(persona, "attitude_history", []),
+            "interaction_ledger": getattr(persona, "interaction_ledger", {}),
+            "persuasion_memory": getattr(persona, "persuasion_memory", []),
+        },
+        "_persona": persona,
+    }
+
+
 async def round_personas(
     clusters: list[dict],
     idea_text: str,
@@ -1362,8 +1399,31 @@ async def round_personas(
     platform_name: str = "",
     domain_info: str = "",
     competitor_context: str = "",
+    pre_assigned_personas: list[dict] | None = None,
 ) -> AsyncGenerator[dict, None]:
-    """Generate personas for all clusters for a specific platform. Yields sim_persona events."""
+    """Generate personas for all clusters for a specific platform. Yields sim_persona events.
+
+    If `pre_assigned_personas` is provided, the fast-path is taken: personas are emitted
+    directly from the pre-defined pool without any LLM calls.
+    """
+    # ── Fast path: use pre-assigned pool personas ─────────────────────────────
+    if pre_assigned_personas is not None:
+        from backend.simulation.persona_generator import persona_from_pool_entry
+        pool_count = len(pre_assigned_personas)
+        for i, cluster in enumerate(clusters):
+            pool_entry = pre_assigned_personas[i] if i < pool_count else pre_assigned_personas[pool_count - 1]
+            try:
+                persona = persona_from_pool_entry(pool_entry, cluster, platform_name)
+                event = _build_sim_persona_event(persona, platform_name)
+                yield event
+            except Exception as exc:
+                logger.warning(
+                    "Pool persona creation failed for cluster %s: %s",
+                    cluster.get("id", "?"), exc,
+                )
+        return
+
+    # ── Original LLM-based generation path ───────────────────────────────────
     sem = asyncio.Semaphore(concurrency)
     queue: asyncio.Queue = asyncio.Queue()
     assigned_names = sample_persona_names(len(clusters))
@@ -1384,39 +1444,7 @@ async def round_personas(
                     competitor_context=competitor_context,
                     forced_archetype=forced_archetype,
                 )
-                await queue.put({
-                    "type": "sim_persona",
-                    "node_id": cluster.get("id", ""),
-                    "platform": platform_name,
-                    "persona": {
-                        "name": persona.name,
-                        "role": persona.role,
-                        "age": persona.age,
-                        "generation": persona.generation,
-                        "seniority": persona.seniority,
-                        "affiliation": persona.affiliation,
-                        "company": persona.company,
-                        "mbti": persona.mbti,
-                        "interests": persona.interests,
-                        "skepticism": persona.skepticism,
-                        "commercial_focus": persona.commercial_focus,
-                        "innovation_openness": persona.innovation_openness,
-                        "source_title": persona.source_title,
-                        "domain_type": persona.domain_type,
-                        "tech_area": persona.tech_area,
-                        "market": persona.market,
-                        "problem_domain": persona.problem_domain,
-                        "jtbd": persona.jtbd,
-                        "cognitive_pattern": persona.cognitive_pattern,
-                        "emotional_state": persona.emotional_state,
-                        "region": getattr(persona, 'region', ''),
-                        "attitude_shift": getattr(persona, 'attitude_shift', 0.0),
-                        "attitude_history": getattr(persona, 'attitude_history', []),
-                        "interaction_ledger": getattr(persona, 'interaction_ledger', {}),
-                        "persuasion_memory": getattr(persona, 'persuasion_memory', []),
-                    },
-                    "_persona": persona,
-                })
+                await queue.put(_build_sim_persona_event(persona, platform_name))
             except Exception as exc:
                 logger.warning("Persona gen failed for %s: %s", cluster.get("id", "?"), exc)
             finally:

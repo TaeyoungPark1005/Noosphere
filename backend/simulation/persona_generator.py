@@ -593,3 +593,63 @@ async def generate_persona(
         region=data.get("region", ""),
     )
     return _validate_age_seniority(persona)
+
+
+# ── Agent pool support ────────────────────────────────────────────────────────
+
+import json as _json
+import os as _os
+import functools as _functools
+
+_AGENT_POOL_PATH = _os.path.join(
+    _os.path.dirname(__file__), "data", "agent_pool.json"
+)
+
+@_functools.lru_cache(maxsize=1)
+def load_agent_pool() -> list[dict]:
+    """Load and cache the pre-defined agent pool from JSON.
+
+    Returns an empty list if the file is missing or malformed, allowing
+    the system to fall back to LLM-based persona generation.
+    """
+    try:
+        with open(_AGENT_POOL_PATH, "r", encoding="utf-8") as f:
+            pool = _json.load(f)
+        logger.info("Loaded %d agents from pool: %s", len(pool), _AGENT_POOL_PATH)
+        return pool
+    except FileNotFoundError:
+        logger.warning("Agent pool file not found at %s — will use LLM fallback", _AGENT_POOL_PATH)
+        return []
+    except Exception as exc:
+        logger.warning("Failed to load agent pool (%s) — will use LLM fallback", exc)
+        return []
+
+
+def persona_from_pool_entry(entry: dict, cluster: dict, platform_name: str) -> "Persona":
+    """Create a Persona instance from a pre-defined pool entry."""
+    rep = cluster.get("representative") or cluster.get("representative_node") or {}
+    source_title = rep.get("title", "") if isinstance(rep, dict) else ""
+
+    return Persona(
+        node_id=cluster.get("id", ""),
+        name=entry["name"],
+        role=entry["role"],
+        age=entry["age"],
+        seniority=entry["seniority"],
+        affiliation=entry["affiliation"],
+        company=entry["company"],
+        mbti=entry["mbti"],
+        interests=entry["interests"],
+        skepticism=entry["skepticism"],
+        commercial_focus=entry["commercial_focus"],
+        innovation_openness=entry["innovation_openness"],
+        domain_type=entry.get("domain_type", "tech"),
+        tech_area=entry.get("tech_area", []),
+        market=entry.get("market", []),
+        problem_domain=entry.get("problem_domain", []),
+        jtbd=entry.get("jtbd", ""),
+        cognitive_pattern=entry.get("cognitive_pattern", ""),
+        emotional_state=entry.get("emotional_state", ""),
+        region=entry.get("region", "NA"),
+        source_title=source_title,
+    )

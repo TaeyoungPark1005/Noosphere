@@ -12,8 +12,10 @@ from backend.simulation.social_rounds import (
     round_personas, generate_seed_post, platform_round, generate_report,
     _classify_segment,
 )
-from backend.simulation.persona_generator import _validate_persona_distribution
+from backend.simulation.persona_generator import _validate_persona_distribution, load_agent_pool
+from backend.simulation.persona_selector import get_distribution, select_agents_for_platform
 from backend.simulation.platforms import PLATFORM_MAP
+from backend import llm as _llm
 
 logger = logging.getLogger(__name__)
 
@@ -712,14 +714,48 @@ async def run_simulation(
         _top_entities = sorted(_entity_counts, key=_entity_counts.get, reverse=True)[:5]
         _competitor_context = ", ".join(_top_entities) if _top_entities else ""
 
+        # --- Pool-based persona pre-selection ---
+        # Try to load the agent pool. If available, use pool-based selection (no per-agent LLM calls).
+        # If the pool is unavailable, fall back to original LLM-based generation.
+        _agent_pool = load_agent_pool()
+        _pool_available = bool(_agent_pool)
+        _pre_assigned_by_platform: dict[str, list[dict] | None] = {p.name: None for p in active_platforms}
+
+        if _pool_available:
+            try:
+                _platform_names = [p.name for p in active_platforms]
+                _distributions = await get_distribution(idea_text, _platform_names, _llm)
+                _used_names: set[str] = set()
+                for _plat in active_platforms:
+                    _dist = _distributions.get(_plat.name, {})
+                    _pre_assigned_by_platform[_plat.name] = select_agents_for_platform(
+                        platform=_plat.name,
+                        n=len(clusters),
+                        distribution=_dist,
+                        pool=_agent_pool,
+                        used_names=_used_names,
+                    )
+                logger.info(
+                    "Pool-based persona selection complete for %d platforms (%d agents each)",
+                    len(active_platforms), len(clusters),
+                )
+            except Exception as _pool_exc:
+                logger.warning(
+                    "Pool-based persona selection failed (%s) — falling back to LLM generation",
+                    _pool_exc,
+                )
+                _pre_assigned_by_platform = {p.name: None for p in active_platforms}
+
         async def collect_personas_for_platform(platform_name: str) -> None:
             results = []
+            _pre_assigned = _pre_assigned_by_platform.get(platform_name)
             try:
                 async for event in round_personas(
                     clusters, idea_text,
                     platform_name=platform_name,
                     domain_info=domain,
                     competitor_context=_competitor_context,
+                    pre_assigned_personas=_pre_assigned,
                 ):
                     persona = event.pop("_persona", None)
                     results.append((event, persona))
