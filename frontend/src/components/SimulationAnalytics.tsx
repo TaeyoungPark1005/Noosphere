@@ -129,9 +129,10 @@ export function SimulationAnalytics({ posts, report, roundStats, personas, segme
     if (entries.length < 2) return []
     return entries.map(([name, data]) => ({
       name: (PLATFORM_SHORT_LABELS as Record<string, string>)[name] ?? name,
-      positive: data.total > 0 ? Math.round(data.positive / data.total * 100) : 0,
-      neutral: data.total > 0 ? Math.round(data.neutral / data.total * 100) : 0,
-      negative: data.total > 0 ? Math.round(data.negative / data.total * 100) : 0,
+      positive: data.total > 0 ? Math.round((data.positive ?? 0) / data.total * 100) : 0,
+      neutral: data.total > 0 ? Math.round((data.neutral ?? 0) / data.total * 100) : 0,
+      negative: data.total > 0 ? Math.round((data.negative ?? 0) / data.total * 100) : 0,
+      constructive: data.total > 0 ? Math.round((data.constructive ?? 0) / data.total * 100) : 0,
     }))
   }, [report])
 
@@ -253,15 +254,15 @@ export function SimulationAnalytics({ posts, report, roundStats, personas, segme
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
 
         {/* Post-level Sentiment Distribution */}
         {sentimentData.length > 0 && (
-          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
             <p style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
               Post Sentiment
             </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ width: 90, height: 90, flexShrink: 0 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -299,89 +300,96 @@ export function SimulationAnalytics({ posts, report, roundStats, personas, segme
 
         {/* Criticism 비중 */}
         {criticismData.length > 0 && (
-          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
             <p style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
               Criticism Breakdown
             </p>
-            <ResponsiveContainer width="100%" height={Math.max(120, criticismData.length * 36)}>
-              <BarChart data={criticismData} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={140}
-                  tick={{ fontSize: 11, fill: '#64748b' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  cursor={{ fill: '#fff1f2' }}
-                  formatter={(v) => [v, 'mentions']}
-                  labelFormatter={(label) => {
-                    const item = criticismData.find(c => c.name === label)
-                    return item?.fullName ?? label
-                  }}
-                />
-                <Bar dataKey="count" fill="#ef4444" radius={[0, 3, 3, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div style={{ flex: 1, minHeight: 120 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={criticismData} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={140}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    cursor={{ fill: '#fff1f2' }}
+                    formatter={(v) => [v, 'mentions']}
+                    labelFormatter={(label) => {
+                      const item = criticismData.find(c => c.name === label)
+                      return item?.fullName ?? label
+                    }}
+                  />
+                  <Bar dataKey="count" fill="#ef4444" radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         )}
 
         {/* What People Loved (praise clusters) */}
         {praiseData.length > 0 && (
-          <div style={{ background: '#fff', border: '1px solid #dcfce7', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: '#fff', border: '1px solid #dcfce7', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
             <p style={{ fontSize: 12, fontWeight: 600, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
               What People Loved
             </p>
-            <ResponsiveContainer width="100%" height={Math.max(120, praiseData.length * 36)}>
-              <BarChart data={praiseData} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={140}
-                  tick={{ fontSize: 11, fill: '#64748b' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  cursor={{ fill: '#f0fdf4' }}
-                  formatter={(v) => [v, 'mentions']}
-                  labelFormatter={(label) => {
-                    const item = praiseData.find(c => c.name === label)
-                    return item?.fullName ?? label
-                  }}
-                />
-                <Bar dataKey="count" fill="#22c55e" radius={[0, 3, 3, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div style={{ flex: 1, minHeight: 120 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={praiseData} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={140}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    cursor={{ fill: '#f0fdf4' }}
+                    formatter={(v) => [v, 'mentions']}
+                    labelFormatter={(label) => {
+                      const item = praiseData.find(c => c.name === label)
+                      return item?.fullName ?? label
+                    }}
+                  />
+                  <Bar dataKey="count" fill="#22c55e" radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         )}
 
         {/* Platform Reception (stacked bar + verdict badges) */}
         {platformReceptionData.length > 0 && (
-          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
             <p style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
               Platform Reception
             </p>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={platformReceptionData} margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} unit="%" />
-                <Tooltip formatter={(v, name) => [`${v}%`, SENTIMENT_LABELS[name as string] ?? name]} />
-                <Legend
-                  formatter={(value) => SENTIMENT_LABELS[value as string] ?? value}
-                  wrapperStyle={{ fontSize: 11 }}
-                />
-                <Bar dataKey="positive" stackId="a" fill="#22c55e" />
-                <Bar dataKey="neutral" stackId="a" fill="#94a3b8" />
-                <Bar dataKey="negative" stackId="a" fill="#ef4444" />
-              </BarChart>
-            </ResponsiveContainer>
+            <div style={{ flex: 1, minHeight: 120 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={platformReceptionData} margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} unit="%" />
+                  <Tooltip formatter={(v, name) => [`${v}%`, SENTIMENT_LABELS[name as string] ?? name]} />
+                  <Legend
+                    formatter={(value) => SENTIMENT_LABELS[value as string] ?? value}
+                    wrapperStyle={{ fontSize: 11 }}
+                  />
+                  <Bar dataKey="positive" stackId="a" fill="#22c55e" />
+                  <Bar dataKey="neutral" stackId="a" fill="#94a3b8" />
+                  <Bar dataKey="negative" stackId="a" fill="#ef4444" />
+                  <Bar dataKey="constructive" stackId="a" fill="#3b82f6" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
             {/* Verdict badges per platform */}
             {report?.platform_summaries && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
@@ -415,7 +423,7 @@ export function SimulationAnalytics({ posts, report, roundStats, personas, segme
 
         {/* ProductHunt Ratings */}
         {phRatingsData.some(d => d.count > 0) && (
-          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
             <p style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
               ProductHunt Ratings
             </p>
@@ -428,24 +436,26 @@ export function SimulationAnalytics({ posts, report, roundStats, personas, segme
                 {report?.producthunt_ratings?.total_reviews ?? 0} reviews
               </span>
             </div>
-            <ResponsiveContainer width="100%" height={140}>
-              <BarChart data={phRatingsData} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={40}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip cursor={{ fill: '#fef3c7' }} />
-                <Bar dataKey="count" fill="#f59e0b" name="Reviews" radius={[0, 3, 3, 0]}>
-                  <LabelList dataKey="count" position="right" style={{ fontSize: 11, fill: '#64748b' }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <div style={{ flex: 1, minHeight: 100 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={phRatingsData} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={40}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip cursor={{ fill: '#fef3c7' }} />
+                  <Bar dataKey="count" fill="#f59e0b" name="Reviews" radius={[0, 3, 3, 0]}>
+                    <LabelList dataKey="count" position="right" style={{ fontSize: 11, fill: '#64748b' }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         )}
 
@@ -570,13 +580,21 @@ export function SimulationAnalytics({ posts, report, roundStats, personas, segme
             {topAffiliations.length > 0 && (
               <div>
                 <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>Top Affiliations</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {topAffiliations.map(a => (
-                    <div key={a.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '75%' }}>{a.name}</span>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>{a.count}</span>
-                    </div>
-                  ))}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {topAffiliations.map(a => {
+                    const pct = Math.round((a.count / topAffiliations[0].count) * 100)
+                    return (
+                      <div key={a.name}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+                          <span style={{ color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '75%' }}>{a.name}</span>
+                          <span style={{ fontWeight: 600, color: '#64748b' }}>{a.count}</span>
+                        </div>
+                        <div style={{ height: 5, borderRadius: 3, background: '#f1f5f9', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${pct}%`, background: '#8b5cf6', borderRadius: 3 }} />
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}

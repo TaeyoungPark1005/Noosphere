@@ -2776,7 +2776,7 @@ async def generate_report(
         if seg not in seg_evidence:
             seg_evidence[seg] = []
         if len(seg_evidence[seg]) < 2:  # 세그먼트당 최대 2개
-            seg_evidence[seg].append(f'"{post.content[:180]}" \u2013{post.author_name}')
+            seg_evidence[seg].append(f'"{post.content}" \u2013{post.author_name}')
 
     if seg_evidence:
         precomputed_block += "\n\nSegment evidence (verbatim quotes per segment):\n"
@@ -2823,7 +2823,7 @@ async def generate_report(
         f"- improvements: top 3-5 actionable suggestions\n"
         f"- key_debates: Identify 2-3 key debates where agents strongly disagreed. For each: topic, main arguments for and against, and how it was resolved (or remains contested). key_debates resolution must reference actual attitude shifts observed in the Attitude shifts section above\n"
         f"- next_steps: 2-5 prioritized actions, grounded in simulation evidence. P0 = must fix before launch, P1 = important but not blocking, P2 = improvements for growth.\n"
-        f"- key_quotes MUST be verbatim excerpts (exact wording) from the 'Segment evidence' section above, not paraphrases.\n"
+        f"- key_quotes MUST be verbatim excerpts (exact wording) from the 'Segment evidence' section above, not paraphrases. Each quote must be a complete, grammatically finished sentence — never cut off mid-sentence.\n"
         f"- All text fields must be in {language}"
     )
 
@@ -2904,9 +2904,11 @@ async def generate_report(
                 weighted["weighted_constructive"] += w
         total = sum(counts.values())
         if total > 0:
+            # constructive는 중립에 가까운 긍정으로 취급해 합산
+            effective_positive = counts["positive"] + counts.get("constructive", 0)
             pv = (
-                "positive" if counts["positive"] > counts["negative"] and counts["positive"] > counts["neutral"]
-                else "negative" if counts["negative"] > counts["positive"] and counts["negative"] > counts["neutral"]
+                "positive" if effective_positive > counts["negative"] and effective_positive > counts["neutral"]
+                else "negative" if counts["negative"] > effective_positive and counts["negative"] > counts["neutral"]
                 else "mixed"
             )
             platform_sentiment[state.platform_name] = {
@@ -3226,89 +3228,6 @@ async def generate_report(
         for k, v in sorted_pairs
     ]
 
-    # ── Attitude shifts: top-5 personas with largest cumulative change (Item 2) ──
-    if personas:
-        attitude_data = []
-        for nid, p in personas.items():
-            history = getattr(p, "attitude_history", [])
-            if not history:
-                continue
-            total_delta = sum(h.get("delta", 0.0) for h in history)
-            # Enrich history items with trigger_summary
-            enriched_history = []
-            for h in history:
-                trigger_post = all_posts_by_id.get(h.get("trigger_post_id", ""))
-                trigger_summary = trigger_post.content[:100] if trigger_post else ""
-                enriched_history.append({**h, "trigger_summary": trigger_summary})
-            attitude_data.append({
-                "name": p.name,
-                "node_id": nid,
-                "total_delta": round(total_delta, 3),
-                "history": enriched_history,
-            })
-        attitude_data.sort(key=lambda x: -abs(x["total_delta"]))
-        report_json["attitude_shifts"] = attitude_data[:5]
-
-    # ── Influence flow: who actually changed whose attitude ─────────────────
-    if personas:
-        influence_flow = []
-        for nid, p_influenced in personas.items():
-            history = getattr(p_influenced, "attitude_history", [])
-            for h in history:
-                tid = h.get("trigger_post_id", "")
-                if not tid or tid == "__cross_sync__":
-                    continue
-                trigger_post = all_posts_by_id.get(tid)
-                if not trigger_post or trigger_post.author_node_id == nid:
-                    continue
-                p_influencer = personas.get(trigger_post.author_node_id)
-                if not p_influencer:
-                    continue
-                influence_flow.append({
-                    "influencer_name": p_influencer.name,
-                    "influenced_name": p_influenced.name,
-                    "round": h.get("round", 0),
-                    "delta": round(h.get("delta", 0.0), 3),
-                    "trigger_snippet": trigger_post.content[:120],
-                    "influencer_segment": _classify_segment(p_influencer),
-                    "influenced_segment": _classify_segment(p_influenced),
-                })
-        influence_flow.sort(key=lambda x: -abs(x["delta"]))
-        report_json["influence_flow"] = influence_flow[:15]
-
-    # ── Segment attitude shifts ──────────────────────────────────────────────
-    if personas:
-        seg_shifts: dict[str, list[float]] = {}
-        for nid, persona_obj in personas.items():
-            seg = _classify_segment(persona_obj)
-            shift = getattr(persona_obj, 'attitude_shift', 0.0)
-            if seg not in seg_shifts:
-                seg_shifts[seg] = []
-            seg_shifts[seg].append(shift)
-
-        segment_attitude_shifts = []
-        for seg, shifts in sorted(seg_shifts.items()):
-            if not shifts:
-                continue
-            avg_delta = round(sum(shifts) / len(shifts), 3)
-            shifted = sum(1 for s in shifts if abs(s) > 0.05)
-            segment_attitude_shifts.append({
-                "segment": seg,
-                "avg_delta": avg_delta,
-                "count": len(shifts),
-                "shifted_count": shifted,
-            })
-        segment_attitude_shifts.sort(key=lambda x: abs(x["avg_delta"]), reverse=True)
-        for item in segment_attitude_shifts:
-            count = item.get("count", 0)
-            if count < 5:
-                item["confidence"] = "low"
-            elif count < 15:
-                item["confidence"] = "medium"
-            else:
-                item["confidence"] = "high"
-        report_json["segment_attitude_shifts"] = segment_attitude_shifts
-
     # ── Segment conversion funnel ────────────────────────────────────────────
     if personas:
         seg_funnel: dict[str, dict] = {}
@@ -3356,168 +3275,6 @@ async def generate_report(
             }
         report_json["segment_conversion_funnel"] = funnel_result
 
-    # ── Region sentiment 집계 ─────────────────────────────────────────────────
-    region_sentiment: dict[str, dict] = {}
-    all_posts_flat = [
-        p for state in platform_states for p in state.posts
-        if p.author_node_id != "__seed__" and not p.id.startswith("__seed__")
-    ]
-    all_personas_map: dict[str, Persona] = {}
-    if personas:
-        all_personas_map = dict(personas)
-
-    # ── Segment journey: round-by-round segment sentiment tracking ───────────
-    segment_journey: dict[int, dict[str, dict[str, int]]] = {}
-    for post in all_posts_flat:
-        if str(getattr(post, "id", "")).startswith("__seed__"):
-            continue
-        r = int(getattr(post, "round_num", 0))
-        if r <= 0:
-            continue
-        persona_sj = all_personas_map.get(getattr(post, "author_node_id", ""))
-        if persona_sj is None:
-            continue
-        seg = _classify_segment(persona_sj)
-        sent = getattr(post, "sentiment", "neutral") or "neutral"
-        if sent not in ("positive", "negative", "neutral", "constructive"):
-            sent = "neutral"
-        if r not in segment_journey:
-            segment_journey[r] = {}
-        if seg not in segment_journey[r]:
-            segment_journey[r][seg] = {"positive": 0, "negative": 0, "neutral": 0, "constructive": 0}
-        segment_journey[r][seg][sent] += 1
-    report_json["segment_journey"] = segment_journey
-
-    # ── Archetype narratives: 세그먼트별 시간축 여정 서사 ─────────────────────
-    archetype_narratives: list[dict] = []
-    if report_json.get("segment_journey") and report_json.get("segment_attitude_shifts"):
-        seg_journey = report_json["segment_journey"]  # dict[int, dict[str, dict[str, int]]]
-
-        for seg_stat in report_json["segment_attitude_shifts"]:
-            segment = seg_stat["segment"]
-
-            # 1. 이 세그먼트의 라운드별 positive_ratio 계산
-            round_sentiments: list[tuple[int, float, int]] = []
-            for rnd in sorted(seg_journey.keys()):
-                seg_data = seg_journey[rnd]
-                if segment not in seg_data:
-                    continue
-                counts = seg_data[segment]
-                total = sum(counts.values())
-                if total == 0:
-                    continue
-                pos_ratio = counts.get("positive", 0) / total
-                round_sentiments.append((rnd, pos_ratio, total))
-
-            if len(round_sentiments) < 2:
-                continue
-
-            # 2. pivot round 탐지: positive_ratio가 전 라운드 대비 20%p 이상 변동
-            pivot_rounds: list[dict] = []
-            for i in range(1, len(round_sentiments)):
-                _prev_rnd, prev_ratio, _ = round_sentiments[i - 1]
-                curr_rnd, curr_ratio, _ = round_sentiments[i]
-                delta = curr_ratio - prev_ratio
-                if abs(delta) >= 0.20:
-                    direction = "positive" if delta > 0 else "negative"
-                    trigger_snippet = ""
-                    trigger_author = ""
-                    for p in all_posts_flat:
-                        p_persona = all_personas_map.get(getattr(p, "author_node_id", ""))
-                        if p_persona and _classify_segment(p_persona) == segment and getattr(p, "round_num", 0) == curr_rnd:
-                            if not trigger_snippet or (getattr(p, "upvotes", 0) or 0) > 0:
-                                trigger_snippet = (getattr(p, "content", "") or "")[:100]
-                                trigger_author = getattr(p, "author_name", "") or ""
-                                break
-                    pivot_rounds.append({
-                        "round": curr_rnd,
-                        "direction": direction,
-                        "delta_pct": round(abs(delta) * 100),
-                        "trigger_post_snippet": trigger_snippet,
-                        "trigger_author": trigger_author,
-                    })
-
-            # 3. journey_summary 문자열 생성 (구간별 dominant sentiment 연결)
-            summary_parts: list[str] = []
-            block_size = max(1, len(round_sentiments) // 3)
-            for block_start in range(0, len(round_sentiments), block_size):
-                block = round_sentiments[block_start:block_start + block_size]
-                if not block:
-                    continue
-                avg_pos = sum(r[1] for r in block) / len(block)
-                rnd_from = block[0][0]
-                rnd_to = block[-1][0]
-                label = "positive" if avg_pos >= 0.5 else "mixed" if avg_pos >= 0.35 else "skeptical"
-                summary_parts.append(f"R{rnd_from}-R{rnd_to}: {label}")
-
-            archetype_narratives.append({
-                "segment": segment,
-                "journey_summary": " → ".join(summary_parts),
-                "pivot_rounds": pivot_rounds,
-                "attitude_delta": seg_stat.get("avg_delta", 0),
-                "persona_count": seg_stat.get("count", 0),
-            })
-
-        archetype_narratives.sort(key=lambda x: len(x["pivot_rounds"]), reverse=True)
-
-    report_json["archetype_narratives"] = archetype_narratives
-
-    for post in all_posts_flat:
-        persona_obj_rs = all_personas_map.get(post.author_node_id)
-        if not persona_obj_rs:
-            continue
-        region = getattr(persona_obj_rs, 'region', None) or "Global"
-        if region not in region_sentiment:
-            region_sentiment[region] = {"positive": 0, "neutral": 0, "negative": 0, "constructive": 0, "total": 0}
-        sentiment = getattr(post, 'sentiment', '') or 'neutral'
-        if sentiment in region_sentiment[region]:
-            region_sentiment[region][sentiment] += 1
-        region_sentiment[region]["total"] += 1
-
-    for region, counts in region_sentiment.items():
-        total = max(counts["total"], 1)
-        counts["positive_pct"] = round(counts["positive"] / total * 100)
-        counts["negative_pct"] = round(counts["negative"] / total * 100)
-
-    report_json["region_sentiment"] = region_sentiment
-
-    # ── Q&A pairs extraction ─────────────────────────────────────────────────
-    QUESTION_ACTIONS = {"ask_hn", "ask_question", "ask_advice", "question", "ask"}
-    qa_pairs = []
-    persona_map_qa = personas or {}
-    for state in platform_states:
-        for post in state.posts:
-            if post.action_type not in QUESTION_ACTIONS:
-                continue
-            if post.author_node_id == "__seed__":
-                continue
-            answers = sorted(
-                [p for p in state.posts if p.parent_id == post.id],
-                key=lambda p: p.upvotes, reverse=True,
-            )[:3]  # 최대 3개 답변
-            q_author = persona_map_qa.get(post.author_node_id)
-            qa_pairs.append({
-                "question_id": post.id,
-                "question_text": post.content[:200],
-                "platform": state.platform_name,
-                "author_name": q_author.name if q_author else post.author_name,
-                "answers": [
-                    {
-                        "text": a.content[:150],
-                        "author_name": (persona_map_qa.get(a.author_node_id).name if persona_map_qa.get(a.author_node_id) else a.author_name),
-                        "upvotes": a.upvotes,
-                    }
-                    for a in answers
-                ],
-                "answered": len(answers) > 0,
-            })
-    # upvotes 합산 기준 내림차순 정렬, 상위 15개
-    qa_pairs = sorted(qa_pairs, key=lambda x: sum(a["upvotes"] for a in x["answers"]), reverse=True)[:15]
-    report_json["qa_pairs"] = qa_pairs
-    # Q&A response_rate (qa_response_rate): 질문 중 답변 받은 비율
-    answered_count = sum(1 for q in qa_pairs if q["answered"])
-    report_json["qa_response_rate"] = round(answered_count / len(qa_pairs), 3) if qa_pairs else 0.0
-
     # response_rate: seed 포스트를 제외한 top-level 포스트 중 reply가 1개 이상 달린 비율
     _non_seed_toplevel = [
         p for state in platform_states for p in state.posts
@@ -3525,43 +3282,6 @@ async def generate_report(
     ]
     _replied_toplevel = [p for p in _non_seed_toplevel if (getattr(p, "reply_count", 0) or 0) >= 1]
     report_json["response_rate"] = round(len(_replied_toplevel) / max(len(_non_seed_toplevel), 1), 3)
-
-    # ── Unaddressed concerns: negative/constructive top-level posts with no replies ──
-    _replied_parent_ids: set[str] = set()
-    for state in platform_states:
-        for post in state.posts:
-            if post.parent_id:
-                _replied_parent_ids.add(post.parent_id)
-
-    unaddressed_candidates = []
-    _uc_personas_map = personas or {}
-    for state in platform_states:
-        for post in state.posts:
-            if post.author_node_id == "__seed__":
-                continue
-            if post.parent_id is not None:
-                continue  # not top-level
-            _post_sentiment = getattr(post, "sentiment", "") or ""
-            if _post_sentiment not in ("negative", "constructive"):
-                continue
-            if post.id in _replied_parent_ids:
-                continue
-            if getattr(post, "reply_count", 0) > 0:
-                continue
-            persona_obj_uc = _uc_personas_map.get(post.author_node_id)
-            author_seg = _classify_segment(persona_obj_uc) if persona_obj_uc else "unknown"
-            unaddressed_candidates.append({
-                "post_id": post.id,
-                "platform": post.platform,
-                "author_name": post.author_name,
-                "author_segment": author_seg,
-                "content_snippet": post.content[:120],
-                "sentiment": _post_sentiment,
-                "weighted_score": getattr(post, "weighted_score", 0.0),
-            })
-    # Sort by weighted_score descending, take top 5
-    unaddressed_candidates.sort(key=lambda x: x["weighted_score"], reverse=True)
-    report_json["unaddressed_concerns"] = unaddressed_candidates[:5]
 
     # ── Top contributors (Item 5) ─────────────────────────────────────────
     contributor_scores: dict[str, dict] = {}

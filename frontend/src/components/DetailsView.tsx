@@ -38,7 +38,10 @@ function NetworkTab({ reportJson }: { reportJson?: ReportJSON }) {
       {/* Echo Chamber Risk */}
       {echoRisk && Object.keys(echoRisk).length > 0 && (
         <div style={{ marginBottom: 24 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>Echo Chamber Risk</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 4 }}>Echo Chamber Risk</h3>
+          <p style={{ margin: '0 0 10px', fontSize: 11, color: '#94a3b8' }}>
+            Entropy measures opinion diversity — higher entropy means more varied views exchanged; lower entropy suggests agents clustered around similar opinions (echo chamber).
+          </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
             {Object.entries(echoRisk).map(([platform, data]) => (
               <div key={platform} style={{

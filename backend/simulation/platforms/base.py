@@ -42,7 +42,7 @@ class AbstractPlatform:
                     "sentiment": {
                         "type": "string",
                         "enum": ["positive", "neutral", "negative", "constructive"],
-                        "description": "Overall sentiment of this post toward the idea being discussed",
+                        "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                     },
                 },
                 "required": ["text", "sentiment"],

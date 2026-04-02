@@ -51,7 +51,7 @@ class IndieHackers(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Overall sentiment of this content toward the idea/product",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                         },
                     },
                     "required": ["text", "sentiment"],
@@ -79,7 +79,7 @@ class IndieHackers(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Overall sentiment of this content toward the idea/product",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                         },
                     },
                     "required": ["text", "mrr_context", "lesson", "sentiment"],
@@ -108,7 +108,7 @@ class IndieHackers(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Overall sentiment of this content toward the idea/product",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                         },
                     },
                     "required": ["text", "milestone_type", "metric", "sentiment"],
@@ -132,7 +132,7 @@ class IndieHackers(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Overall sentiment of this content toward the idea/product",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                         },
                     },
                     "required": ["text", "specific_question", "sentiment"],
@@ -152,7 +152,7 @@ class IndieHackers(AbstractPlatform):
                     "sentiment": {
                         "type": "string",
                         "enum": ["positive", "neutral", "negative", "constructive"],
-                        "description": "Overall sentiment of this content toward the idea/product",
+                        "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                     },
                 },
                 "required": ["text", "sentiment"],

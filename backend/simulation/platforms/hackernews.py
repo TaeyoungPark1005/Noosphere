@@ -33,7 +33,7 @@ class HackerNews(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Overall sentiment of this content toward the idea/product",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                         },
                     },
                     "required": ["title", "text", "sentiment"],
@@ -57,7 +57,7 @@ class HackerNews(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Overall sentiment of this content toward the idea/product",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                         },
                     },
                     "required": ["text", "question", "sentiment"],
@@ -80,7 +80,7 @@ class HackerNews(AbstractPlatform):
                     "sentiment": {
                         "type": "string",
                         "enum": ["positive", "neutral", "negative", "constructive"],
-                        "description": "Overall sentiment of this content toward the idea/product",
+                        "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                     },
                 },
                 "required": ["text", "is_question", "sentiment"],

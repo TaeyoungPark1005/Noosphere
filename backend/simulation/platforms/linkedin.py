@@ -36,7 +36,7 @@ class LinkedIn(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Overall sentiment of this content toward the idea/product",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                         },
                     },
                     "required": ["text", "sentiment"],
@@ -64,7 +64,7 @@ class LinkedIn(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Overall sentiment of this content toward the idea/product",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                         },
                     },
                     "required": ["title", "text", "key_takeaway", "sentiment"],
@@ -95,7 +95,7 @@ class LinkedIn(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Overall sentiment of this content toward the idea/product",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                         },
                     },
                     "required": ["text", "business_insight", "hashtags", "sentiment"],
@@ -120,7 +120,7 @@ class LinkedIn(AbstractPlatform):
                     "sentiment": {
                         "type": "string",
                         "enum": ["positive", "neutral", "negative", "constructive"],
-                        "description": "Overall sentiment of this content toward the idea/product",
+                        "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                     },
                 },
                 "required": ["text", "stance", "sentiment"],

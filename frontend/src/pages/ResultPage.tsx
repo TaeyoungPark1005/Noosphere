@@ -8,8 +8,7 @@ import { SourcesView } from '../components/SourcesView'
 import { SimulationAnalytics } from '../components/SimulationAnalytics'
 import type { RoundStat } from '../components/SimulationAnalytics'
 import { TopPosts } from '../components/TopPosts'
-import { getResults, exportPdfUrl, exportJson } from '../api'
-import { VERDICT_CONFIG } from '../constants'
+import { getResults, exportPdfUrl } from '../api'
 import type { SimResults, SocialPost, Platform, Persona } from '../types'
 
 type Tab = 'analysis' | 'simulation' | 'launch' | 'final' | 'details'
@@ -74,9 +73,11 @@ function PlatformComparison({
           const pos = platformPosts.filter(p => p.sentiment === 'positive').length
           const neu = platformPosts.filter(p => p.sentiment === 'neutral').length
           const neg = platformPosts.filter(p => p.sentiment === 'negative').length
+          const con = platformPosts.filter(p => p.sentiment === 'constructive').length
           const posPct = total > 0 ? Math.round((pos / total) * 100) : 0
           const neuPct = total > 0 ? Math.round((neu / total) * 100) : 0
           const negPct = total > 0 ? Math.round((neg / total) * 100) : 0
+          const conPct = total > 0 ? Math.round((con / total) * 100) : 0
 
           // Find most active agent
           const authorCounts = new Map<string, number>()
@@ -111,11 +112,13 @@ function PlatformComparison({
                 {posPct > 0 && <div style={{ width: `${posPct}%`, background: '#22c55e' }} />}
                 {neuPct > 0 && <div style={{ width: `${neuPct}%`, background: '#94a3b8' }} />}
                 {negPct > 0 && <div style={{ width: `${negPct}%`, background: '#ef4444' }} />}
+                {conPct > 0 && <div style={{ width: `${conPct}%`, background: '#3b82f6' }} />}
               </div>
               <div style={{ display: 'flex', gap: 6, fontSize: 9, color: '#94a3b8', marginBottom: 6 }}>
                 <span>{posPct}% pos</span>
                 <span>{neuPct}% neu</span>
                 <span>{negPct}% neg</span>
+                {conPct > 0 && <span>{conPct}% con</span>}
               </div>
               {topName && (
                 <div style={{ fontSize: 10, color: '#64748b', borderTop: '1px solid #f1f5f9', paddingTop: 4 }}>
@@ -204,8 +207,6 @@ export function ResultPage() {
     return filtered
   }, [results, selectedRound])
 
-  const verdict = results?.report_json?.verdict
-  const v = verdict ? (VERDICT_CONFIG[verdict] || VERDICT_CONFIG.mixed) : null
 
   return (
     <div style={{ minHeight: '100vh', background: '#fafafa' }}>
@@ -228,51 +229,19 @@ export function ResultPage() {
 
         {results && (
           <>
-            {/* Verdict summary card — always visible */}
-            {v && (
-              <div className="result-verdict-card" style={{
-                padding: '12px 18px', borderRadius: 10, marginBottom: 20,
-                border: `1px solid ${v.color}30`, background: `${v.color}08`,
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                boxShadow: 'var(--shadow-card)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <svg
-                    width="20" height="20" viewBox="0 0 24 24"
-                    fill="none" stroke={v.color} strokeWidth="2"
-                    aria-hidden="true"
-                    style={{ flexShrink: 0 }}
-                    dangerouslySetInnerHTML={{ __html: v.icon }}
-                  />
-                  <span style={{ fontSize: 16, fontWeight: 700, color: v.color }}>{v.label}</span>
-                  <span style={{ fontSize: 13, color: '#94a3b8' }}>
-                    · {results.report_json?.evidence_count ?? 0} interactions simulated
-                  </span>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <a
-                    href={exportPdfUrl(simId ?? '')}
-                    download
-                    style={{
-                      display: 'inline-block', padding: '6px 14px', background: '#6366f1',
-                      color: '#fff', borderRadius: 7, textDecoration: 'none', fontSize: 12,
-                      fontWeight: 600,
-                    }}>
-                    ↓ PDF
-                  </a>
-                  <button
-                    onClick={() => exportJson(simId ?? '')}
-                    style={{
-                      display: 'inline-block', padding: '6px 14px', background: '#6366f1',
-                      color: '#fff', borderRadius: 7, border: 'none', fontSize: 12,
-                      fontWeight: 600, cursor: 'pointer',
-                    }}>
-                    ↓ JSON
-                  </button>
-                </div>
-              </div>
-            )}
-
+            {/* PDF download — always visible above tabs */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+              <a
+                href={exportPdfUrl(simId ?? '')}
+                download
+                style={{
+                  display: 'inline-block', padding: '8px 18px', background: '#6366f1',
+                  color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13,
+                  fontWeight: 600,
+                }}>
+                ↓ Download Report PDF
+              </a>
+            </div>
             {/* Tab navigation */}
             <div className="result-tabs" style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid #e2e8f0' }}>
               {tabs.map(t => (
@@ -315,6 +284,8 @@ export function ResultPage() {
               )}
               {tab === 'simulation' && (
                 <div>
+                  {/* Verdict + metrics cards */}
+                  <ReportView report={results.report_json} noDetails />
                   <PlatformComparison
                     posts={results.posts_json}
                     personas={results.personas_json}
@@ -326,7 +297,8 @@ export function ResultPage() {
                     personas={results.personas_json}
                     segmentDistribution={mergedSegmentDist}
                   />
-                  <ReportView report={results.report_json} />
+                  {/* Segment Reactions + full analysis */}
+                  <ReportView report={results.report_json} noSummary />
                   {/* Round filter */}
                   {maxRound > 0 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 24, marginBottom: 12 }}>

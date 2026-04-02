@@ -37,7 +37,7 @@ class RedditStartups(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Overall sentiment of this content toward the idea/product",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                         },
                     },
                     "required": ["title", "text", "sentiment"],
@@ -57,7 +57,7 @@ class RedditStartups(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Overall sentiment of this content toward the idea/product",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                         },
                     },
                     "required": ["text", "sentiment"],
@@ -80,7 +80,7 @@ class RedditStartups(AbstractPlatform):
                     "sentiment": {
                         "type": "string",
                         "enum": ["positive", "neutral", "negative", "constructive"],
-                        "description": "Overall sentiment of this content toward the idea/product",
+                        "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
                     },
                 },
                 "required": ["text", "contrarian_point", "sentiment"],
