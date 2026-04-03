@@ -164,7 +164,7 @@ export function SimulatePage() {
           {sim.warnings.map((w, i) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'flex-start', gap: t.space[2],
-              background: '#fffbeb', color: '#b45309',
+              background: t.color.warningLight, color: t.color.warningDark,
               border: `1px solid ${t.color.warningBorder}`, borderRadius: 7,
               fontSize: t.font.size.sm, padding: `${t.space[2]} ${t.space[3]}`,
               animation: 'fadeIn 0.3s ease',
@@ -515,7 +515,7 @@ export function SimulatePage() {
       {sim.earlyStop && (phase === 'rounds' || (phase === 'error' && totalPosts > 0)) && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: t.space[2],
-          background: '#fffbeb', color: t.color.warningText,
+          background: t.color.warningLight, color: t.color.warningText,
           border: `1px solid ${t.color.warningBorder}`, borderRadius: 7,
           fontSize: t.font.size.md, fontWeight: t.font.weight.semibold, padding: `${t.space[2]} ${t.space[3]}`,
           margin: `0 0 ${t.space[4]} 0`,

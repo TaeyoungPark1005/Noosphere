@@ -127,7 +127,7 @@ export function ReportView({ report, noSummary, noDetails }: {
             <div
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: t.space[1],
-                background: '#fffbeb', color: t.color.warningText,
+                background: t.color.warningLight, color: t.color.warningText,
                 border: `1px solid ${t.color.warningBorder}`, borderRadius: t.radius.pill,
                 fontSize: t.font.size.sm, fontWeight: t.font.weight.semibold, padding: '5px 12px',
                 marginBottom: t.space[4], cursor: 'default',
