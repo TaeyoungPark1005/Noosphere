@@ -475,7 +475,7 @@ export function HomePage() {
         {import.meta.env.VITE_CLERK_PUBLISHABLE_KEY && (
           <div style={{ marginTop: 10, fontSize: 11, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 5 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-            <span>로그인 상태에서 시뮬레이션을 실행하면 완료 시 이메일로 보고서를 보내드립니다.</span>
+            <span>Sign in to receive the completed report to your email.</span>
           </div>
         )}
       </main>

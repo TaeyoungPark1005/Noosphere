@@ -80,7 +80,7 @@ export function HistoryPage() {
   const handleDelete = async (e: React.MouseEvent, item: HistoryItem) => {
     e.stopPropagation()
     const confirmed = window.confirm(
-      `"${item.input_text_snippet}…"\n\n이 시뮬레이션을 완전히 삭제할까요? 복구할 수 없습니다.`
+      `"${item.input_text_snippet}…"\n\nPermanently delete this simulation? This cannot be undone.`
     )
     if (!confirmed) return
     setDeletingIds(prev => ({ ...prev, [item.id]: true }))

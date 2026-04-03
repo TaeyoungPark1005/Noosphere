@@ -209,7 +209,7 @@ export function SimulatePage() {
             We'll send the completed report to your registered email address.
             {' '}
             <span style={{ color: '#0369a1', opacity: 0.75 }}>
-              (시뮬레이션이 완료되면 등록된 계정의 이메일로 보고서를 보내드립니다.)
+              (The completed report will be sent to your registered email address.)
             </span>
           </span>
         </div>
@@ -221,7 +221,7 @@ export function SimulatePage() {
           {sim.canResume && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
-                {sim.lastRound}라운드까지 저장됨
+                Saved up to round {sim.lastRound}
               </p>
               <button
                 onClick={handleResume}
@@ -233,13 +233,13 @@ export function SimulatePage() {
                   opacity: isResuming ? 0.7 : 1,
                 }}
               >
-                {isResuming ? '재개 중...' : `${sim.lastRound + 1}라운드부터 재개하기`}
+                {isResuming ? 'Resuming...' : `Resume from round ${sim.lastRound + 1}`}
               </button>
             </div>
           )}
           {!sim.canResume && sim.backendStatus === 'running' && (
             <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
-              연결이 끊겼지만 시뮬레이션은 아직 실행 중일 수 있습니다.
+              Connection lost, but the simulation may still be running.
             </p>
           )}
           {resumeError && (
@@ -536,8 +536,8 @@ export function SimulatePage() {
       {!sim.earlyStop && sim.eta && sim.eta.etaSeconds > 0 && phase === 'rounds' && (
         <p style={{ fontSize: 13, color: '#94a3b8', margin: '0 0 16px 0' }}>
           {sim.eta.etaSeconds < 60
-            ? `약 ${sim.eta.etaSeconds}초 남음`
-            : `약 ${Math.ceil(sim.eta.etaSeconds / 60)}분 남음`}
+            ? `~${sim.eta.etaSeconds}s remaining`
+            : `~${Math.ceil(sim.eta.etaSeconds / 60)}m remaining`}
           {' '}({sim.eta.completedRounds}/{sim.eta.totalRounds} rounds)
         </p>
       )}
