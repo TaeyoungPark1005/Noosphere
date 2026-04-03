@@ -10,13 +10,13 @@ function getVerdictStyle(verdict: string): { background: string; color: string }
   if (v === 'mixed') return { background: '#fef3c7', color: '#b45309' }
   if (v === 'skeptical') return { background: '#ffedd5', color: '#c2410c' }
   if (v === 'negative') return { background: '#fee2e2', color: '#b91c1c' }
-  return { background: '#f1f5f9', color: '#475569' }
+  return { background: t.color.bgSubtle, color: '#475569' }
 }
 
 const STATUS_CONFIG = {
   completed: { color: '#22c55e', label: 'Done' },
   running:   { color: '#f59e0b', label: 'Running' },
-  failed:    { color: '#ef4444', label: 'Failed' },
+  failed:    { color: t.color.danger, label: 'Failed' },
   partial:   { color: '#f97316', label: 'Partial' },
 }
 
