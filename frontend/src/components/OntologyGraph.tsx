@@ -501,7 +501,7 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
           onEngineStop={handleEngineStop}
           nodeId="id"
           nodeLabel={(node: unknown) => isGraphNode(node) ? `${node.name} · ${node.type}` : ''}
-          nodeColor={(node: unknown) => isGraphNode(node) ? getNodeColor(node) : t.color.textMuted}
+          nodeColor={(node: unknown) => isGraphNode(node) ? getNodeColor(node) : '#94a3b8'}
           nodeRelSize={9}
           linkColor={(link: unknown) => isGraphLink(link) ? getLinkColor(link) : '#cbd5e1'}
           linkWidth={2}
@@ -510,7 +510,7 @@ export const OntologyGraph = memo(function OntologyGraph({ data, contextNodes = 
           linkDirectionalArrowRelPos={1}
           linkLineDash={(link: unknown) => isGraphLink(link) && EDGE_DASHED[link.type] ? [4, 2] : null}
           onNodeClick={handleNodeClick}
-          backgroundColor={t.color.bgCard}
+          backgroundColor="#f8fafc"
         />
         {selectedEntity && (
           <SidePanel
@@ -740,7 +740,7 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
         onEngineStop={handleEngineStop}
         nodeId="id"
         nodeLabel={(node: unknown) => isContextRenderNode(node) ? `${node.title}\n${node.source}` : ''}
-        nodeColor={(node: unknown) => isContextRenderNode(node) ? node.color : t.color.textMuted}
+        nodeColor={(node: unknown) => isContextRenderNode(node) ? node.color : '#94a3b8'}
         nodeRelSize={7}
         linkColor={(link: unknown) => isContextRenderLink(link) ? getLinkColor(link) : 'rgba(148,163,184,0.3)'}
         linkWidth={(link: unknown) => isContextRenderLink(link) ? getLinkWidth(link) : 1}
@@ -749,7 +749,7 @@ export const ContextGraph = memo(function ContextGraph({ data, width: widthProp 
         onNodeClick={(node: unknown) => {
           if (isContextRenderNode(node)) handleNodeClick(node)
         }}
-        backgroundColor={t.color.bgCard}
+        backgroundColor="#f8fafc"
       />
     </div>
   )

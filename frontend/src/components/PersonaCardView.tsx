@@ -13,15 +13,15 @@ const PLATFORM_LABELS: Record<Platform, string> = {
 const PLATFORM_COLORS: Record<Platform, string> = {
   hackernews:      '#ff6600',
   producthunt:     '#da552f',
-  indiehackers:    t.color.primaryHover,
+  indiehackers:    '#4f46e5',
   reddit_startups: '#ff4500',
   linkedin:        '#0077b5',
 }
 
 const BIAS_COLORS: Record<string, string> = {
-  academic:   t.color.primary,
-  commercial: t.color.success,
-  skeptic:    t.color.warning,
+  academic:   '#6366f1',
+  commercial: '#22c55e',
+  skeptic:    '#f59e0b',
   evangelist: '#ec4899',
 }
 
@@ -183,7 +183,7 @@ export function PersonaCardView({ personas, allPosts }: PersonaCardViewProps) {
                 <span style={{
                   display: 'inline-block',
                   fontSize: 10, fontWeight: t.font.weight.bold, padding: '2px 7px', borderRadius: t.radius.lg,
-                  background: t.color.primary + '15', color: t.color.primary, border: `1px solid ${t.color.primary}30`,
+                  background: '#6366f115', color: '#6366f1', border: '1px solid #6366f130',
                   textTransform: 'capitalize',
                 }}>{p.affiliation.replace('_', ' ')}</span>
               ) : null}
