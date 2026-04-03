@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { t } from '../tokens'
 import { Header } from '../components/Header'
 import { ReportView } from '../components/ReportView'
 import { DetailsView } from '../components/DetailsView'
@@ -60,11 +61,11 @@ function PlatformComparison({
   return (
     <div style={{ marginBottom: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.color.primary} strokeWidth="2" aria-hidden="true">
           <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
           <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
         </svg>
-        <span style={{ fontSize: 14, fontWeight: 700, color: '#6366f1' }}>Platform Comparison</span>
+        <span style={{ fontSize: t.font.size.lg, fontWeight: t.font.weight.bold, color: t.color.primary }}>Platform Comparison</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(platforms.length, 5)}, 1fr)`, gap: 10 }}>
         {platforms.map(platform => {
@@ -97,33 +98,33 @@ function PlatformComparison({
 
           return (
             <div key={platform} style={{
-              background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
-              padding: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              background: t.color.bgPage, border: `1px solid ${t.color.border}`, borderRadius: t.radius.md,
+              padding: t.space[3], boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
             }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
+              <div style={{ fontSize: t.font.size.sm, fontWeight: t.font.weight.bold, color: t.color.textPrimary, marginBottom: 6 }}>
                 {PLATFORM_SHORT[platform] ?? platform}
               </div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#6366f1', marginBottom: 6 }}>
+              <div style={{ fontSize: t.font.size['2xl'], fontWeight: t.font.weight.bold, color: t.color.primary, marginBottom: 6 }}>
                 {total}
-                <span style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8', marginLeft: 4 }}>posts</span>
+                <span style={{ fontSize: t.font.size.xs, fontWeight: t.font.weight.normal, color: t.color.textMuted, marginLeft: 4 }}>posts</span>
               </div>
               {/* Sentiment mini-bar */}
-              <div style={{ display: 'flex', height: 5, borderRadius: 3, overflow: 'hidden', background: '#e2e8f0', marginBottom: 6 }}>
-                {posPct > 0 && <div style={{ width: `${posPct}%`, background: '#22c55e' }} />}
-                {neuPct > 0 && <div style={{ width: `${neuPct}%`, background: '#94a3b8' }} />}
-                {negPct > 0 && <div style={{ width: `${negPct}%`, background: '#ef4444' }} />}
+              <div style={{ display: 'flex', height: 5, borderRadius: 3, overflow: 'hidden', background: t.color.border, marginBottom: 6 }}>
+                {posPct > 0 && <div style={{ width: `${posPct}%`, background: t.color.success }} />}
+                {neuPct > 0 && <div style={{ width: `${neuPct}%`, background: t.color.textMuted }} />}
+                {negPct > 0 && <div style={{ width: `${negPct}%`, background: t.color.danger }} />}
                 {conPct > 0 && <div style={{ width: `${conPct}%`, background: '#3b82f6' }} />}
               </div>
-              <div style={{ display: 'flex', gap: 6, fontSize: 9, color: '#94a3b8', marginBottom: 6 }}>
+              <div style={{ display: 'flex', gap: 6, fontSize: 9, color: t.color.textMuted, marginBottom: 6 }}>
                 <span>{posPct}% pos</span>
                 <span>{neuPct}% neu</span>
                 <span>{negPct}% neg</span>
                 {conPct > 0 && <span>{conPct}% con</span>}
               </div>
               {topName && (
-                <div style={{ fontSize: 10, color: '#64748b', borderTop: '1px solid #f1f5f9', paddingTop: 4 }}>
-                  Most active: <span style={{ fontWeight: 600, color: '#1e293b' }}>{topName}</span>
-                  <span style={{ color: '#94a3b8' }}> ({topCount})</span>
+                <div style={{ fontSize: 10, color: t.color.textSecondary, borderTop: `1px solid ${t.color.bgSubtle}`, paddingTop: 4 }}>
+                  Most active: <span style={{ fontWeight: t.font.weight.semibold, color: t.color.textPrimary }}>{topName}</span>
+                  <span style={{ color: t.color.textMuted }}> ({topCount})</span>
                 </div>
               )}
             </div>
@@ -225,23 +226,23 @@ export function ResultPage() {
 
 
   return (
-    <div style={{ minHeight: '100vh', background: '#fafafa' }}>
+    <div style={{ minHeight: '100vh', background: t.color.bgBody }}>
       <Header />
-      <main className="page-enter" style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+      <main className="page-enter" style={{ maxWidth: 1280, margin: '0 auto', padding: `${t.space[8]} ${t.space[6]}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: t.space[6] }}>
           <button onClick={() => navigate('/app')}
-            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14 }}>
+            style={{ background: 'none', border: 'none', color: t.color.textSecondary, cursor: 'pointer', fontSize: t.font.size.lg }}>
             ← New simulation
           </button>
         </div>
 
         {loading && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#64748b', fontSize: 14 }}>
-            <span className="spinner" style={{ borderColor: 'rgba(100,116,139,0.3)', borderTopColor: '#64748b' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: t.color.textSecondary, fontSize: t.font.size.lg }}>
+            <span className="spinner" style={{ borderColor: 'rgba(100,116,139,0.3)', borderTopColor: t.color.textSecondary }} />
             Loading results...
           </div>
         )}
-        {error && <p role="alert" style={{ color: '#ef4444' }}>{error}</p>}
+        {error && <p role="alert" style={{ color: t.color.danger }}>{error}</p>}
 
         {results && (
           <>
@@ -251,25 +252,25 @@ export function ResultPage() {
                 href={exportPdfUrl(simId ?? '')}
                 download
                 style={{
-                  display: 'inline-block', padding: '8px 18px', background: '#6366f1',
-                  color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13,
-                  fontWeight: 600,
+                  display: 'inline-block', padding: `${t.space[2]} 18px`, background: t.color.primary,
+                  color: t.color.textInverse, borderRadius: t.radius.md, textDecoration: 'none', fontSize: t.font.size.md,
+                  fontWeight: t.font.weight.semibold,
                 }}>
                 ↓ Download Report PDF
               </a>
             </div>
             {/* Tab navigation */}
-            <div className="result-tabs" style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid #e2e8f0' }}>
-              {tabs.map(t => (
-                <button key={t.id} onClick={() => setTab(t.id)}
+            <div className="result-tabs" style={{ display: 'flex', gap: 4, marginBottom: t.space[6], borderBottom: `1px solid ${t.color.border}` }}>
+              {tabs.map(tab_ => (
+                <button key={tab_.id} onClick={() => setTab(tab_.id)}
                   style={{
-                    padding: '10px 20px', fontSize: 14, cursor: 'pointer', border: 'none',
-                    background: 'none', fontWeight: tab === t.id ? 600 : 400,
-                    borderBottom: tab === t.id ? '2px solid #6366f1' : '2px solid transparent',
-                    color: tab === t.id ? '#6366f1' : '#64748b',
+                    padding: '10px 20px', fontSize: t.font.size.lg, cursor: 'pointer', border: 'none',
+                    background: 'none', fontWeight: tab === tab_.id ? t.font.weight.semibold : t.font.weight.normal,
+                    borderBottom: tab === tab_.id ? `2px solid ${t.color.primary}` : '2px solid transparent',
+                    color: tab === tab_.id ? t.color.primary : t.color.textSecondary,
                     transition: 'color 0.15s, border-color 0.15s',
                   }}>
-                  {t.label}
+                  {tab_.label}
                 </button>
               ))}
             </div>
@@ -280,9 +281,9 @@ export function ResultPage() {
                   <button onClick={handleCopy} style={{
                     position: 'absolute', top: 0, right: 0,
                     display: 'flex', alignItems: 'center', gap: 5,
-                    padding: '5px 10px', fontSize: 12, cursor: 'pointer', borderRadius: 6,
-                    border: '1px solid #e2e8f0', background: copied ? '#f0fdf4' : '#fff',
-                    color: copied ? '#16a34a' : '#64748b', transition: 'all 0.15s', fontWeight: 500,
+                    padding: '5px 10px', fontSize: t.font.size.sm, cursor: 'pointer', borderRadius: t.radius.sm,
+                    border: `1px solid ${t.color.border}`, background: copied ? '#f0fdf4' : t.color.bgPage,
+                    color: copied ? '#16a34a' : t.color.textSecondary, transition: 'all 0.15s', fontWeight: t.font.weight.medium,
                   }}>
                     {copied
                       ? <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Copied!</>
@@ -296,8 +297,8 @@ export function ResultPage() {
                       onClick={() => setSourcesOpen(o => !o)}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 6,
-                        background: 'none', border: '1px solid #e2e8f0', borderRadius: 7,
-                        padding: '7px 14px', fontSize: 13, color: '#64748b', cursor: 'pointer',
+                        background: 'none', border: `1px solid ${t.color.border}`, borderRadius: 7,
+                        padding: '7px 14px', fontSize: t.font.size.md, color: t.color.textSecondary, cursor: 'pointer',
                         transition: 'background 0.15s ease',
                       }}>
                       {sourcesOpen ? '▾' : '▸'} Sources ({results.sources_json?.length ?? 0})
@@ -330,7 +331,7 @@ export function ResultPage() {
                   {/* Round filter */}
                   {maxRound > 0 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 24, marginBottom: 12 }}>
-                      <label htmlFor="result-round-filter" style={{ fontSize: 12, color: '#64748b', fontWeight: 600, flexShrink: 0 }}>
+                      <label htmlFor="result-round-filter" style={{ fontSize: t.font.size.sm, color: t.color.textSecondary, fontWeight: t.font.weight.semibold, flexShrink: 0 }}>
                         Round:
                       </label>
                       <select
@@ -338,8 +339,8 @@ export function ResultPage() {
                         value={selectedRound}
                         onChange={e => setSelectedRound(Number(e.target.value))}
                         style={{
-                          fontSize: 12, padding: '4px 8px', borderRadius: 6,
-                          border: '1px solid #e2e8f0', background: '#fff', color: '#1e293b',
+                          fontSize: t.font.size.sm, padding: `${t.space[1]} ${t.space[2]}`, borderRadius: t.radius.sm,
+                          border: `1px solid ${t.color.border}`, background: t.color.bgPage, color: t.color.textPrimary,
                           cursor: 'pointer',
                         }}
                       >
@@ -360,9 +361,9 @@ export function ResultPage() {
                   <button onClick={handleCopy} style={{
                     position: 'absolute', top: 0, right: 0,
                     display: 'flex', alignItems: 'center', gap: 5,
-                    padding: '5px 10px', fontSize: 12, cursor: 'pointer', borderRadius: 6,
-                    border: '1px solid #e2e8f0', background: copied ? '#f0fdf4' : '#fff',
-                    color: copied ? '#16a34a' : '#64748b', transition: 'all 0.15s', fontWeight: 500,
+                    padding: '5px 10px', fontSize: t.font.size.sm, cursor: 'pointer', borderRadius: t.radius.sm,
+                    border: `1px solid ${t.color.border}`, background: copied ? '#f0fdf4' : t.color.bgPage,
+                    color: copied ? '#16a34a' : t.color.textSecondary, transition: 'all 0.15s', fontWeight: t.font.weight.medium,
                   }}>
                     {copied
                       ? <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Copied!</>
@@ -377,9 +378,9 @@ export function ResultPage() {
                   <button onClick={handleCopy} style={{
                     position: 'absolute', top: 0, right: 0,
                     display: 'flex', alignItems: 'center', gap: 5,
-                    padding: '5px 10px', fontSize: 12, cursor: 'pointer', borderRadius: 6,
-                    border: '1px solid #e2e8f0', background: copied ? '#f0fdf4' : '#fff',
-                    color: copied ? '#16a34a' : '#64748b', transition: 'all 0.15s', fontWeight: 500,
+                    padding: '5px 10px', fontSize: t.font.size.sm, cursor: 'pointer', borderRadius: t.radius.sm,
+                    border: `1px solid ${t.color.border}`, background: copied ? '#f0fdf4' : t.color.bgPage,
+                    color: copied ? '#16a34a' : t.color.textSecondary, transition: 'all 0.15s', fontWeight: t.font.weight.medium,
                   }}>
                     {copied
                       ? <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Copied!</>

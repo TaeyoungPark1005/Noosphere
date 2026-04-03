@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { t } from '../tokens'
 import { AppLogo } from '../components/AppLogo'
 
 const SIMULATION_PLATFORMS = [
@@ -31,8 +32,8 @@ const STEPS = [
 export function LandingPage() {
   return (
     <div style={{
-      background: '#f8fafc',
-      color: '#1e293b',
+      background: t.color.bgCard,
+      color: t.color.textPrimary,
       minHeight: '100vh',
       fontFamily: "'DM Sans', sans-serif",
     }}>
@@ -42,12 +43,12 @@ export function LandingPage() {
         position: 'sticky', top: 0, zIndex: 10,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '12px 28px',
-          background: '#fff',
-          borderBottom: '1px solid #e2e8f0',
+          background: t.color.bgPage,
+          borderBottom: `1px solid ${t.color.border}`,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <AppLogo size={24} />
-            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 500, color: '#1e293b' }}>
+            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: t.font.size.md, fontWeight: t.font.weight.medium, color: t.color.textPrimary }}>
               Noosphere
             </span>
           </div>
@@ -59,8 +60,8 @@ export function LandingPage() {
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         textAlign: 'center',
         padding: '72px 24px 0',
-        background: '#fff',
-        borderBottom: '1px solid #f1f5f9',
+        background: t.color.bgPage,
+        borderBottom: `1px solid ${t.color.bgSubtle}`,
         position: 'relative',
       }}>
         {/* gradient accent */}
@@ -72,14 +73,14 @@ export function LandingPage() {
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 7,
           padding: '4px 14px', borderRadius: 100,
-          background: '#f1f5f9', border: '1px solid #e2e8f0',
+          background: t.color.bgSubtle, border: `1px solid ${t.color.border}`,
           marginBottom: 22,
         }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#6355e0' }} />
           <span style={{
             fontFamily: "'IBM Plex Mono', monospace",
             fontSize: 10, letterSpacing: '0.1em',
-            color: '#64748b', textTransform: 'uppercase' as const,
+            color: t.color.textSecondary, textTransform: 'uppercase' as const,
           }}>
             Pre-launch Intelligence
           </span>
@@ -87,17 +88,17 @@ export function LandingPage() {
 
         <h1 className="landing-hero-h1" style={{
           fontFamily: "'Fraunces', serif",
-          fontSize: 56, fontWeight: 600, lineHeight: 1.12,
+          fontSize: 56, fontWeight: t.font.weight.semibold, lineHeight: 1.12,
           color: '#0f172a', margin: '0 0 18px',
           maxWidth: 680, letterSpacing: '-0.02em',
         }}>
           How will the market react{' '}
-          <em style={{ fontStyle: 'italic', fontWeight: 300, color: '#94a3b8' }}>before</em>
+          <em style={{ fontStyle: 'italic', fontWeight: 300, color: t.color.textMuted }}>before</em>
           {' '}you launch?
         </h1>
 
         <p style={{
-          fontSize: 17, lineHeight: 1.65, color: '#64748b',
+          fontSize: 17, lineHeight: 1.65, color: t.color.textSecondary,
           maxWidth: 500, margin: '0 0 36px',
         }}>
           Simulate real-world reactions across 5 tech communities — grounded in signals
@@ -107,7 +108,7 @@ export function LandingPage() {
         <div className="landing-hero-cta" style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 52 }}>
           <Link to="/app" className="landing-cta-primary" style={{
             fontFamily: "'IBM Plex Mono', monospace",
-            fontSize: 13, fontWeight: 500, color: '#fff',
+            fontSize: t.font.size.md, fontWeight: t.font.weight.medium, color: t.color.textInverse,
             padding: '12px 26px', borderRadius: 9,
             background: 'var(--primary)', textDecoration: 'none',
             boxShadow: '0 2px 12px rgba(99,102,241,0.3)',
@@ -118,9 +119,9 @@ export function LandingPage() {
           </Link>
           <a href="https://github.com/TaeyoungPark1005/Noosphere" target="_blank" rel="noopener noreferrer" className="landing-cta-secondary" style={{
             fontFamily: "'IBM Plex Mono', monospace",
-            fontSize: 13, color: '#64748b',
+            fontSize: t.font.size.md, color: t.color.textSecondary,
             padding: '11px 26px', borderRadius: 9,
-            border: '1.5px solid #e2e8f0', textDecoration: 'none',
+            border: `1.5px solid ${t.color.border}`, textDecoration: 'none',
             display: 'inline-flex', alignItems: 'center', gap: 7,
           }}
           >
@@ -135,7 +136,7 @@ export function LandingPage() {
             position: 'relative', paddingBottom: '56.25%', height: 0,
             borderRadius: 14, overflow: 'hidden',
             boxShadow: '0 4px 32px rgba(15,23,42,0.10)',
-            border: '1px solid #e2e8f0',
+            border: `1px solid ${t.color.border}`,
           }}>
             <iframe
               src="https://www.youtube.com/embed/WPQOuvVJQXM?autoplay=0&rel=0&modestbranding=1"
@@ -159,41 +160,41 @@ export function LandingPage() {
         <div style={{
           fontFamily: "'IBM Plex Mono', monospace",
           fontSize: 10, letterSpacing: '0.18em',
-          color: '#94a3b8', textTransform: 'uppercase' as const,
+          color: t.color.textMuted, textTransform: 'uppercase' as const,
           marginBottom: 32, textAlign: 'center',
         }}>
           How it works
         </div>
 
         <div style={{
-          border: '1px solid #e2e8f0', borderRadius: 12,
-          overflow: 'hidden', background: '#fff',
+          border: `1px solid ${t.color.border}`, borderRadius: t.radius.lg,
+          overflow: 'hidden', background: t.color.bgPage,
           boxShadow: 'var(--shadow-card)',
         }}>
           {STEPS.map((step, i) => (
             <div key={step.num} className="landing-how-row" style={{
               display: 'flex', alignItems: 'flex-start', gap: 28,
               padding: '28px 36px',
-              borderBottom: i < STEPS.length - 1 ? '1px solid #f1f5f9' : 'none',
+              borderBottom: i < STEPS.length - 1 ? `1px solid ${t.color.bgSubtle}` : 'none',
             }}>
               <span style={{
-                fontFamily: "'IBM Plex Mono', monospace", fontSize: 12,
-                color: '#94a3b8', letterSpacing: '0.06em',
+                fontFamily: "'IBM Plex Mono', monospace", fontSize: t.font.size.sm,
+                color: t.color.textMuted, letterSpacing: '0.06em',
                 flexShrink: 0, paddingTop: 2, minWidth: 26,
               }}>
                 {step.num}
               </span>
-              <div className="landing-how-divider" style={{ width: 1, alignSelf: 'stretch', background: '#f1f5f9', flexShrink: 0 }} />
+              <div className="landing-how-divider" style={{ width: 1, alignSelf: 'stretch', background: t.color.bgSubtle, flexShrink: 0 }} />
               <div className="landing-how-title" style={{ flexShrink: 0, minWidth: 160 }}>
                 <span style={{
                   fontFamily: "'Fraunces', serif",
-                  fontSize: 18, fontWeight: 600,
-                  color: '#1e293b', lineHeight: 1.3,
+                  fontSize: 18, fontWeight: t.font.weight.semibold,
+                  color: t.color.textPrimary, lineHeight: 1.3,
                 }}>
                   {step.title}
                 </span>
               </div>
-              <p style={{ fontSize: 14, lineHeight: 1.7, color: '#64748b', margin: 0, paddingTop: 2 }}>
+              <p style={{ fontSize: t.font.size.lg, lineHeight: 1.7, color: t.color.textSecondary, margin: 0, paddingTop: 2 }}>
                 {step.desc}
               </p>
             </div>
@@ -208,15 +209,15 @@ export function LandingPage() {
       }}>
         <div style={{
           background: '#fafbff',
-          borderRadius: 16,
+          borderRadius: t.radius.xl,
           padding: '40px 24px',
-          border: '1px solid #eef2ff',
+          border: `1px solid ${t.color.primaryLight}`,
         }}>
 
         <div style={{
           fontFamily: "'IBM Plex Mono', monospace",
           fontSize: 10, letterSpacing: '0.18em',
-          color: '#94a3b8', textTransform: 'uppercase' as const,
+          color: t.color.textMuted, textTransform: 'uppercase' as const,
           marginBottom: 14,
         }}>
           Simulation platforms
@@ -224,10 +225,10 @@ export function LandingPage() {
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginBottom: 32 }}>
           {SIMULATION_PLATFORMS.map(name => (
             <span key={name} style={{
-              fontFamily: "'IBM Plex Mono', monospace", fontSize: 11,
+              fontFamily: "'IBM Plex Mono', monospace", fontSize: t.font.size.xs,
               color: '#475569', padding: '6px 14px',
-              border: '1px solid #e2e8f0', borderRadius: 100,
-              background: '#fff',
+              border: `1px solid ${t.color.border}`, borderRadius: 100,
+              background: t.color.bgPage,
               transition: 'border-color 0.15s ease, background 0.15s ease',
             }}>
               {name}
@@ -238,7 +239,7 @@ export function LandingPage() {
         <div style={{
           fontFamily: "'IBM Plex Mono', monospace",
           fontSize: 10, letterSpacing: '0.18em',
-          color: '#94a3b8', textTransform: 'uppercase' as const,
+          color: t.color.textMuted, textTransform: 'uppercase' as const,
           marginBottom: 14,
         }}>
           Data sources
@@ -246,10 +247,10 @@ export function LandingPage() {
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }}>
           {DATA_SOURCES.map(name => (
             <span key={name} style={{
-              fontFamily: "'IBM Plex Mono', monospace", fontSize: 11,
-              color: '#94a3b8', padding: '5px 12px',
-              border: '1px solid #f1f5f9', borderRadius: 100,
-              background: '#f8fafc',
+              fontFamily: "'IBM Plex Mono', monospace", fontSize: t.font.size.xs,
+              color: t.color.textMuted, padding: '5px 12px',
+              border: `1px solid ${t.color.bgSubtle}`, borderRadius: 100,
+              background: t.color.bgCard,
             }}>
               {name}
             </span>
@@ -261,24 +262,24 @@ export function LandingPage() {
       {/* ── CTA ──────────────────────────────────────────────────────── */}
       <section style={{
         textAlign: 'center', padding: '72px 24px',
-        background: '#fff', borderTop: '1px solid #e2e8f0',
+        background: t.color.bgPage, borderTop: `1px solid ${t.color.border}`,
       }}>
         <h2 style={{
           fontFamily: "'Fraunces', serif",
-          fontSize: 42, fontWeight: 600, lineHeight: 1.15,
+          fontSize: 42, fontWeight: t.font.weight.semibold, lineHeight: 1.15,
           color: '#0f172a', margin: '0 0 14px',
           letterSpacing: '-0.02em',
         }}>
           Launch with{' '}
-          <em style={{ fontStyle: 'italic', fontWeight: 300, color: '#94a3b8' }}>informed</em>
+          <em style={{ fontStyle: 'italic', fontWeight: 300, color: t.color.textMuted }}>informed</em>
           {' '}conviction.
         </h2>
-        <p style={{ fontSize: 15, lineHeight: 1.65, color: '#64748b', margin: '0 0 32px' }}>
+        <p style={{ fontSize: 15, lineHeight: 1.65, color: t.color.textSecondary, margin: '0 0 32px' }}>
           Run your first simulation in under 2 minutes.
         </p>
         <Link to="/app" className="landing-cta-primary" style={{
           fontFamily: "'IBM Plex Mono', monospace",
-          fontSize: 13, fontWeight: 500, color: '#fff',
+          fontSize: t.font.size.md, fontWeight: t.font.weight.medium, color: t.color.textInverse,
           padding: '13px 32px', borderRadius: 9,
           background: 'var(--primary)', textDecoration: 'none',
           boxShadow: '0 2px 12px rgba(99,102,241,0.3)',
@@ -292,18 +293,18 @@ export function LandingPage() {
       {/* ── Footer ───────────────────────────────────────────────────── */}
       <footer className="landing-footer" style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '20px 48px', borderTop: '1px solid #f1f5f9',
-        background: '#fff',
+        padding: '20px 48px', borderTop: `1px solid ${t.color.bgSubtle}`,
+        background: t.color.bgPage,
       }}>
         <span style={{
           fontFamily: "'IBM Plex Mono', monospace",
-          fontSize: 12, color: '#94a3b8',
+          fontSize: t.font.size.sm, color: t.color.textMuted,
         }}>
           Noosphere
         </span>
         <span style={{
           fontFamily: "'IBM Plex Mono', monospace",
-          fontSize: 11, color: '#cbd5e1',
+          fontSize: t.font.size.xs, color: '#cbd5e1',
         }}>
           © 2026 · Pre-launch Intelligence
         </span>
