@@ -14,8 +14,8 @@ function getVerdictStyle(verdict: string): { background: string; color: string }
 }
 
 const STATUS_CONFIG = {
-  completed: { color: '#22c55e', label: 'Done' },
-  running:   { color: '#f59e0b', label: 'Running' },
+  completed: { color: t.color.success, label: 'Done' },
+  running:   { color: t.color.warning, label: 'Running' },
   failed:    { color: t.color.danger, label: 'Failed' },
   partial:   { color: '#f97316', label: 'Partial' },
 }
