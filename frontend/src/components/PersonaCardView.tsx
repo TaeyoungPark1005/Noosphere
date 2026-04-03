@@ -257,7 +257,7 @@ export function PersonaCardView({ personas, allPosts }: PersonaCardViewProps) {
                   <div style={{
                     marginTop: t.space[2], display: 'inline-block',
                     fontSize: 10, fontWeight: t.font.weight.bold, padding: '2px 8px',
-                    borderRadius: t.radius.lg, background: '#fef3c7', color: '#b45309',
+                    borderRadius: t.radius.lg, background: t.color.warningSubtle, color: t.color.warningDark,
                     border: `1px solid ${t.color.warningBorder}`,
                   }}>
                     Influence: {score}

@@ -7,8 +7,8 @@ import type { HistoryItem } from '../types'
 
 function getVerdictStyle(verdict: string): { background: string; color: string } {
   const v = verdict.toLowerCase()
-  if (v === 'positive') return { background: '#dcfce7', color: '#15803d' }
-  if (v === 'mixed') return { background: '#fef3c7', color: '#b45309' }
+  if (v === 'positive') return { background: '#dcfce7', color: t.color.successText }
+  if (v === 'mixed') return { background: t.color.warningSubtle, color: t.color.warningDark }
   if (v === 'skeptical') return { background: '#ffedd5', color: '#c2410c' }
   if (v === 'negative') return { background: '#fee2e2', color: t.color.dangerDark }
   return { background: t.color.bgSubtle, color: t.color.textStrong }
@@ -247,8 +247,8 @@ export function HistoryPage() {
                   {item.adoption_score != null && (
                     <span style={{
                       fontSize: t.font.size.xs, padding: '1px 8px', borderRadius: t.radius.md,
-                      background: item.adoption_score >= 70 ? '#dcfce7' : item.adoption_score >= 40 ? '#fef3c7' : '#fee2e2',
-                      color: item.adoption_score >= 70 ? '#15803d' : item.adoption_score >= 40 ? '#b45309' : t.color.dangerDark,
+                      background: item.adoption_score >= 70 ? '#dcfce7' : item.adoption_score >= 40 ? t.color.warningSubtle : '#fee2e2',
+                      color: item.adoption_score >= 70 ? t.color.successText : item.adoption_score >= 40 ? t.color.warningDark : t.color.dangerDark,
                       fontWeight: t.font.weight.semibold,
                     }}>
                       {item.adoption_score} pts
