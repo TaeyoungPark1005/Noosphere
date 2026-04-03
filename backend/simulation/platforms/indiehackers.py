@@ -51,7 +51,7 @@ class IndieHackers(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; negative: any doubt, concern, criticism, or skepticism — DEFAULT for critical posts; constructive: ONLY if the entire response is an explicit numbered improvement list with no criticism (extremely rare, <5%)",
                         },
                     },
                     "required": ["text", "sentiment"],
@@ -79,7 +79,7 @@ class IndieHackers(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; negative: any doubt, concern, criticism, or skepticism — DEFAULT for critical posts; constructive: ONLY if the entire response is an explicit numbered improvement list with no criticism (extremely rare, <5%)",
                         },
                     },
                     "required": ["text", "mrr_context", "lesson", "sentiment"],
@@ -108,7 +108,7 @@ class IndieHackers(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; negative: any doubt, concern, criticism, or skepticism — DEFAULT for critical posts; constructive: ONLY if the entire response is an explicit numbered improvement list with no criticism (extremely rare, <5%)",
                         },
                     },
                     "required": ["text", "milestone_type", "metric", "sentiment"],
@@ -132,7 +132,7 @@ class IndieHackers(AbstractPlatform):
                         "sentiment": {
                             "type": "string",
                             "enum": ["positive", "neutral", "negative", "constructive"],
-                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
+                            "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; negative: any doubt, concern, criticism, or skepticism — DEFAULT for critical posts; constructive: ONLY if the entire response is an explicit numbered improvement list with no criticism (extremely rare, <5%)",
                         },
                     },
                     "required": ["text", "specific_question", "sentiment"],
@@ -152,7 +152,7 @@ class IndieHackers(AbstractPlatform):
                     "sentiment": {
                         "type": "string",
                         "enum": ["positive", "neutral", "negative", "constructive"],
-                        "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; constructive: ONLY when primarily listing concrete improvement steps (use sparingly, <15% of posts)",
+                        "description": "Tone toward the idea — positive: excited/supportive; neutral: balanced/exploratory; negative: skeptical/critical/opposed; negative: any doubt, concern, criticism, or skepticism — DEFAULT for critical posts; constructive: ONLY if the entire response is an explicit numbered improvement list with no criticism (extremely rare, <5%)",
                     },
                 },
                 "required": ["text", "sentiment"],

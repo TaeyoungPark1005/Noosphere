@@ -988,15 +988,19 @@ def _validate_sentiment(content: str, declared: str, skepticism: int = 5) -> str
     lower = content.lower()
     neg_count = sum(1 for w in _NEGATIVE_KEYWORDS if w in lower)
     pos_count = sum(1 for w in _POSITIVE_KEYWORDS if w in lower)
-    if declared == "positive" and neg_count >= 2 and pos_count == 0:
+    # constructive with ANY negative keywords → negative (most constructive posts are actually critical)
+    if declared == "constructive" and neg_count >= 1:
         return "negative"
-    elif declared == "constructive" and neg_count >= 2 and pos_count == 0:
+    if declared == "positive" and neg_count >= 2 and pos_count == 0:
         return "negative"
     if declared == "negative" and pos_count >= 2 and neg_count == 0:
         return "positive"
-    # High-skepticism agents declaring positive with no negative keywords → downgrade to neutral
+    # High-skepticism agents: downgrade positive → neutral if any doubt signal
     if declared == "positive" and skepticism >= 8 and neg_count >= 1 and pos_count <= 1:
         return "neutral"
+    # High-skepticism agents: downgrade constructive → negative
+    if declared == "constructive" and skepticism >= 7:
+        return "negative"
     _ACCEPTED = {"positive", "neutral", "negative", "constructive"}
     if declared not in _ACCEPTED:
         return "neutral"
