@@ -83,7 +83,7 @@ function PricingContent({ getToken }: { getToken: () => Promise<string | null> }
       {PACKS.map(pack => (
         <div key={pack.name} style={{
           width: 220, padding: '28px 24px', borderRadius: 14,
-          border: pack.highlight ? '2px solid #6355e0' : `1.5px solid ${t.color.border}`,
+          border: pack.highlight ? `2px solid ${t.color.primaryVivid}` : `1.5px solid ${t.color.border}`,
           background: pack.highlight ? '#faf9ff' : t.color.bgPage,
           boxShadow: pack.highlight ? '0 4px 24px rgba(99,85,224,0.12)' : 'none',
           display: 'flex', flexDirection: 'column', gap: 12,
@@ -92,7 +92,7 @@ function PricingContent({ getToken }: { getToken: () => Promise<string | null> }
           {pack.highlight && (
             <div style={{
               position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
-              background: '#6355e0', color: t.color.textInverse, fontSize: t.font.size.xs, fontWeight: t.font.weight.bold,
+              background: t.color.primaryVivid, color: t.color.textInverse, fontSize: t.font.size.xs, fontWeight: t.font.weight.bold,
               padding: '3px 12px', borderRadius: 20, letterSpacing: '0.04em',
               whiteSpace: 'nowrap',
             }}>
@@ -100,7 +100,7 @@ function PricingContent({ getToken }: { getToken: () => Promise<string | null> }
             </div>
           )}
           <div>
-            <div style={{ fontSize: t.font.size.md, fontWeight: t.font.weight.semibold, color: '#6355e0', marginBottom: 2 }}>
+            <div style={{ fontSize: t.font.size.md, fontWeight: t.font.weight.semibold, color: t.color.primaryVivid, marginBottom: 2 }}>
               {pack.name}
             </div>
             <div style={{ fontSize: t.font.size.xs, color: t.color.textMuted }}>{pack.desc}</div>
@@ -120,7 +120,7 @@ function PricingContent({ getToken }: { getToken: () => Promise<string | null> }
             disabled={!!loading || !pack.priceId}
             style={{
               marginTop: 8, padding: '10px 0', borderRadius: t.radius.md, border: 'none',
-              background: pack.highlight ? '#6355e0' : t.color.textPrimary,
+              background: pack.highlight ? t.color.primaryVivid : t.color.textPrimary,
               color: t.color.textInverse, fontWeight: t.font.weight.semibold, fontSize: t.font.size.lg, cursor: loading || !pack.priceId ? 'not-allowed' : 'pointer',
               opacity: loading || !pack.priceId ? 0.6 : 1,
               transition: 'opacity 0.15s',
@@ -195,8 +195,8 @@ function PricingPageInner() {
       <div style={{ maxWidth: 780, margin: '0 auto', padding: '60px 24px' }}>
         {status === 'cancel' && (
           <div style={{
-            padding: '14px 20px', borderRadius: 10, background: '#fef2f2',
-            border: '1px solid #fca5a5', color: '#b91c1c', fontSize: t.font.size.lg,
+            padding: '14px 20px', borderRadius: 10, background: t.color.dangerLight,
+            border: `1px solid ${t.color.dangerBorder}`, color: t.color.dangerDark, fontSize: t.font.size.lg,
             fontWeight: t.font.weight.medium, marginBottom: 32, textAlign: 'center',
           }}>
             Payment cancelled. No charge was made.

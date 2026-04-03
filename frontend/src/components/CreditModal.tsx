@@ -121,7 +121,7 @@ export function CreditModal({ open, onClose, reason = 'topup' }: Props) {
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '12px 14px', borderRadius: t.radius.lg,
-                border: pack.highlight ? '2px solid #6355e0' : `1.5px solid ${t.color.border}`,
+                border: pack.highlight ? `2px solid ${t.color.primaryVivid}` : `1.5px solid ${t.color.border}`,
                 background: pack.highlight ? '#faf9ff' : t.color.bgPage,
                 cursor: loading || !pack.priceId ? 'not-allowed' : 'pointer',
                 opacity: loading && loading !== pack.priceId ? 0.5 : 1,
@@ -131,13 +131,13 @@ export function CreditModal({ open, onClose, reason = 'topup' }: Props) {
             >
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: t.font.size.md, fontWeight: t.font.weight.bold, color: pack.highlight ? '#6355e0' : t.color.textPrimary }}>
+                  <span style={{ fontSize: t.font.size.md, fontWeight: t.font.weight.bold, color: pack.highlight ? t.color.primaryVivid : t.color.textPrimary }}>
                     {pack.name}
                   </span>
                   {pack.highlight && (
                     <span style={{
                       fontSize: t.font.size.xs, fontWeight: t.font.weight.bold, color: t.color.textInverse,
-                      background: '#6355e0', padding: '1px 7px', borderRadius: t.radius.lg,
+                      background: t.color.primaryVivid, padding: '1px 7px', borderRadius: t.radius.lg,
                     }}>
                       Best value
                     </span>

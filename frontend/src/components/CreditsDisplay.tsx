@@ -52,19 +52,19 @@ export function CreditsDisplay({ refetchKey }: Props) {
       style={{
         display: 'flex', alignItems: 'center', gap: 5,
         padding: '5px 12px', borderRadius: 20,
-        border: `1.5px solid ${low ? '#fca5a5' : t.color.border}`,
+        border: `1.5px solid ${low ? t.color.dangerBorder : t.color.border}`,
         background: low ? '#fff1f2' : t.color.bgCard,
-        color: low ? t.color.danger : '#475569',
+        color: low ? t.color.danger : t.color.textStrong,
         fontSize: t.font.size.md, fontWeight: t.font.weight.medium, cursor: 'pointer',
         transition: 'all 0.15s',
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.borderColor = low ? t.color.danger : '#475569'
+        e.currentTarget.style.borderColor = low ? t.color.danger : t.color.textStrong
         e.currentTarget.style.color = low ? t.color.danger : t.color.textPrimary
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.borderColor = low ? '#fca5a5' : t.color.border
-        e.currentTarget.style.color = low ? t.color.danger : '#475569'
+        e.currentTarget.style.borderColor = low ? t.color.dangerBorder : t.color.border
+        e.currentTarget.style.color = low ? t.color.danger : t.color.textStrong
       }}
     >
       <span style={{ fontSize: t.font.size.xs }}>⚡</span>

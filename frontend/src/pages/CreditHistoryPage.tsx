@@ -74,7 +74,7 @@ export function CreditHistoryPage() {
             onClick={() => setCreditModalOpen(true)}
             style={{
               padding: `${t.space[2]} 18px`, borderRadius: t.radius.md, border: 'none',
-              background: '#6355e0', color: t.color.textInverse,
+              background: t.color.primaryVivid, color: t.color.textInverse,
               fontSize: t.font.size.md, fontWeight: t.font.weight.semibold, cursor: 'pointer',
             }}
           >
@@ -89,7 +89,7 @@ export function CreditHistoryPage() {
           <div style={{ textAlign: 'center', padding: '60px 0', color: t.color.textMuted }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>⚡</div>
             <p style={{ fontSize: t.font.size.lg, margin: 0 }}>No transactions yet.</p>
-            <Link to="/app" style={{ fontSize: t.font.size.md, color: '#6355e0', marginTop: 8, display: 'inline-block' }}>
+            <Link to="/app" style={{ fontSize: t.font.size.md, color: t.color.primaryVivid, marginTop: 8, display: 'inline-block' }}>
               Run your first simulation →
             </Link>
           </div>
@@ -113,7 +113,7 @@ export function CreditHistoryPage() {
                     {item.sim_id && (
                       <Link
                         to={`/result/${item.sim_id}`}
-                        style={{ marginLeft: 8, color: '#6355e0', textDecoration: 'none' }}
+                        style={{ marginLeft: 8, color: t.color.primaryVivid, textDecoration: 'none' }}
                       >
                         View result →
                       </Link>
