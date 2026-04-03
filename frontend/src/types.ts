@@ -92,6 +92,7 @@ export interface PlatformSentimentSummary {
   positive: number
   neutral: number
   negative: number
+  constructive?: number
   verdict: string
   total: number
   positive_pct?: number

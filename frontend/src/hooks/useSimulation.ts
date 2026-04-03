@@ -51,11 +51,11 @@ export interface SimState {
   segmentDistribution?: Record<string, number>
   earlyStop: { stoppedAtRound: number; convergenceScore: number } | null
   personaGenPhase: boolean
+  queuePosition: number | null
 }
 
 export type UseSimulationResult = SimState & {
   reconnect: () => void
-  queuePosition: number | null
 }
 
 function createInitialState(): SimState {
@@ -82,13 +82,13 @@ function createInitialState(): SimState {
     liveSentiment: { positive: 0, neutral: 0, negative: 0 },
     earlyStop: null,
     personaGenPhase: false,
+    queuePosition: null,
   }
 }
 
 export function useSimulation(simId: string): UseSimulationResult {
   const [state, setState] = useState<SimState>(createInitialState)
   const [connectionKey, setConnectionKey] = useState(0)
-  const [queuePosition, setQueuePosition] = useState<number | null>(null)
   const lastEventIdRef = useRef<string>('0')
   const postQueueRef = useRef<SocialPost[]>([])
   const drainTimerRef = useRef<number | null>(null)
@@ -375,10 +375,10 @@ export function useSimulation(simId: string): UseSimulationResult {
         .then(data => {
           if (cancelled) return
           if (data.status === 'queued') {
-            setQueuePosition(data.position)
+            setState(prev => ({ ...prev, queuePosition: data.position }))
             timer = window.setTimeout(poll, 3000)
           } else {
-            setQueuePosition(null)
+            setState(prev => ({ ...prev, queuePosition: null }))
           }
         })
         .catch(() => {
@@ -462,6 +462,5 @@ export function useSimulation(simId: string): UseSimulationResult {
   return {
     ...state,
     reconnect,
-    queuePosition,
   }
 }

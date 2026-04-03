@@ -46,35 +46,7 @@ interface Props {
   segmentDistribution?: Record<string, number>
 }
 
-const SEGMENT_COLORS: Record<string, string> = {
-  developer: '#3b82f6',
-  investor: '#10b981',
-  founder: '#f59e0b',
-  skeptic: '#ef4444',
-  early_adopter: '#8b5cf6',
-  pm: '#06b6d4',
-  designer: '#ec4899',
-  marketer: '#f97316',
-  executive: '#6b7280',
-  other: '#94a3b8',
-  analyst: '#7c3aed',
-}
-
-const SEGMENT_LABELS: Record<string, string> = {
-  developer: 'Developer',
-  investor: 'Investor',
-  founder: 'Founder',
-  skeptic: 'Skeptic',
-  early_adopter: 'Early Adopter',
-  pm: 'PM',
-  designer: 'Designer',
-  marketer: 'Marketer',
-  executive: 'Executive',
-  other: 'Other',
-  analyst: 'Analyst',
-}
-
-export function SimulationAnalytics({ posts, report, roundStats, personas, segmentDistribution }: Props) {
+export function SimulationAnalytics({ posts, report, personas }: Props) {
   const allPosts: SocialPost[] = useMemo(
     () => Object.values(posts).flatMap(list => list ?? []),
     [posts]
