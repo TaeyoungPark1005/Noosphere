@@ -83,6 +83,7 @@ export function useMockSimulation(): SimState {
     liveSentiment: { positive: 0, neutral: 0, negative: 0 },
     earlyStop: null,
     personaGenPhase: false,
+    queuePosition: null,
   })
 
   useEffect(() => {

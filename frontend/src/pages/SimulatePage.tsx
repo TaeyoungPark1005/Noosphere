@@ -114,10 +114,6 @@ export function SimulatePage() {
     error: 'Simulation failed',
   }
 
-  const personaPct = sim.agentCount > 0
-    ? Math.min(100, (sim.personaCount / sim.agentCount) * 100)
-    : 0
-
   // 피드 영역 (상태 헤더 + 소스 타임라인 + 시뮬 피드)
   const feedPanel = (
     <>
