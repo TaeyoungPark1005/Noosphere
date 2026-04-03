@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { API_BASE } from '../api'
+import { API_BASE, getQueuePosition } from '../api'
 import type { Platform, Persona, SocialPost, ContextGraphData, ContextGraphNode, ContextGraphEdge } from '../types'
 
 export type SourceItem = { source: string; title: string; snippet: string }
@@ -55,6 +55,7 @@ export interface SimState {
 
 export type UseSimulationResult = SimState & {
   reconnect: () => void
+  queuePosition: number | null
 }
 
 function createInitialState(): SimState {
@@ -87,6 +88,7 @@ function createInitialState(): SimState {
 export function useSimulation(simId: string): UseSimulationResult {
   const [state, setState] = useState<SimState>(createInitialState)
   const [connectionKey, setConnectionKey] = useState(0)
+  const [queuePosition, setQueuePosition] = useState<number | null>(null)
   const lastEventIdRef = useRef<string>('0')
   const postQueueRef = useRef<SocialPost[]>([])
   const drainTimerRef = useRef<number | null>(null)
@@ -361,6 +363,35 @@ export function useSimulation(simId: string): UseSimulationResult {
     }
   }, [simId, connectionKey])
 
+  // Queue position polling — active while status is 'connecting' and not yet sourcing/running
+  useEffect(() => {
+    if (!simId || state.status !== 'connecting') return
+    let cancelled = false
+    let timer: number | null = null
+
+    const poll = () => {
+      if (cancelled) return
+      getQueuePosition(simId)
+        .then(data => {
+          if (cancelled) return
+          if (data.status === 'queued') {
+            setQueuePosition(data.position)
+            timer = window.setTimeout(poll, 3000)
+          } else {
+            setQueuePosition(null)
+          }
+        })
+        .catch(() => {
+          if (!cancelled) timer = window.setTimeout(poll, 5000)
+        })
+    }
+    poll()
+    return () => {
+      cancelled = true
+      if (timer !== null) window.clearTimeout(timer)
+    }
+  }, [simId, state.status])
+
   useEffect(() => {
     if (state.status !== 'error' || !simId) return
     let cancelled = false
@@ -431,5 +462,6 @@ export function useSimulation(simId: string): UseSimulationResult {
   return {
     ...state,
     reconnect,
+    queuePosition,
   }
 }

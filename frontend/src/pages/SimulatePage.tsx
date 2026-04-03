@@ -555,14 +555,53 @@ export function SimulatePage() {
           marginTop: 48, textAlign: 'center', color: '#94a3b8', fontSize: 14,
           animation: 'fadeIn 0.5s ease',
         }}>
-          <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'center' }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-          </div>
-          {phase === 'personas'
-            ? `Building ${sim.agentCount} agent personas across platforms...`
-            : phase === 'seeding'
-            ? 'Generating seed posts for each platform...'
-            : 'Waiting for simulation to start...'}
+          {sim.queuePosition !== null && sim.queuePosition > 0 ? (
+            /* 큐 대기 중 */
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+              </div>
+              <div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: '#6366f1', lineHeight: 1 }}>
+                  #{sim.queuePosition}
+                </div>
+                <div style={{ fontSize: 13, color: '#64748b', marginTop: 6 }}>in queue</div>
+              </div>
+              <div style={{
+                background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10,
+                padding: '12px 20px', maxWidth: 320,
+              }}>
+                <p style={{ margin: 0, fontSize: 13, color: '#475569', lineHeight: 1.6 }}>
+                  Another simulation is currently running. Yours will start automatically when it's done.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} style={{
+                    width: 6, height: 6, borderRadius: '50%', background: '#6366f1',
+                    animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+                  }} />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'center' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+              </div>
+              {phase === 'personas'
+                ? `Building ${sim.agentCount} agent personas across platforms...`
+                : phase === 'seeding'
+                ? 'Generating seed posts for each platform...'
+                : 'Waiting for simulation to start...'}
+            </>
+          )}
         </div>
       )}
     </>

@@ -92,6 +92,11 @@ export async function getSimulationStatus(sim_id: string): Promise<{ status: str
   return res.json()
 }
 
+export async function getQueuePosition(sim_id: string): Promise<{ status: string; position: number }> {
+  const res = await fetchWithRetry(`${API_BASE}/simulate/${sim_id}/queue-position`)
+  return res.json()
+}
+
 export async function deleteSimulation(sim_id: string): Promise<void> {
   await fetchWithRetry(`${API_BASE}/simulate/${sim_id}`, { method: 'DELETE' })
 }
