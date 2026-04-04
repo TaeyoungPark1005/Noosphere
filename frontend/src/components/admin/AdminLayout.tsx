@@ -70,7 +70,7 @@ export const badge = (
     error: { background: '#fef2f2', color: '#dc2626' },
     info: { background: '#eff6ff', color: '#2563eb' },
     neutral: { background: '#f1f5f9', color: '#64748b' },
-    purple: { background: '#faf5ff', color: '#7c3aed' },
+    purple: { background: '#faf5ff', color: t.color.accentDark },
   };
   return (
     <span
@@ -100,8 +100,8 @@ export const UserAvatar: React.FC<{ email: string; size?: number }> = ({
     .slice(0, 2)
     .toUpperCase();
   const colors = [
-    '#6366f1', '#8b5cf6', '#3b82f6', '#22c55e',
-    '#f59e0b', '#ef4444', '#ec4899', '#06b6d4',
+    '#6366f1', t.color.accent, '#3b82f6', '#22c55e',
+    t.color.warning, t.color.danger, '#ec4899', '#06b6d4',
   ];
   const color = colors[email.charCodeAt(0) % colors.length];
   return (
@@ -320,7 +320,7 @@ const AdminLayout: React.FC<Props> = ({ activeSection, onNavigate, children }) =
             style={{
               width: 32,
               height: 32,
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              background: `linear-gradient(135deg, ${t.color.primary}, ${t.color.accent})`,
               borderRadius: 8,
               display: 'flex',
               alignItems: 'center',

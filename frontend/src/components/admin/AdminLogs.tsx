@@ -5,7 +5,7 @@ import { t } from '../../tokens';
 import type { AdminLogRow } from '../../types/admin';
 
 const LEVEL_COLORS: Record<string, { bg: string; color: string }> = {
-  error: { bg: '#fef2f2', color: '#dc2626' },
+  error: { bg: t.color.dangerLight, color: t.color.dangerText },
   warning: { bg: t.color.warningLight, color: t.color.warningMid },
   info: { bg: '#eff6ff', color: '#2563eb' },
 };

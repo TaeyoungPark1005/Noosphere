@@ -122,7 +122,7 @@ export function CreditModal({ open, onClose, reason = 'topup' }: Props) {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '12px 14px', borderRadius: t.radius.lg,
                 border: pack.highlight ? `2px solid ${t.color.primaryVivid}` : `1.5px solid ${t.color.border}`,
-                background: pack.highlight ? '#faf9ff' : t.color.bgPage,
+                background: pack.highlight ? t.color.accentSurface : t.color.bgPage,
                 cursor: loading || !pack.priceId ? 'not-allowed' : 'pointer',
                 opacity: loading && loading !== pack.priceId ? 0.5 : 1,
                 transition: 'all 0.15s',

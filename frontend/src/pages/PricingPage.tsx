@@ -84,7 +84,7 @@ function PricingContent({ getToken }: { getToken: () => Promise<string | null> }
         <div key={pack.name} style={{
           width: 220, padding: '28px 24px', borderRadius: 14,
           border: pack.highlight ? `2px solid ${t.color.primaryVivid}` : `1.5px solid ${t.color.border}`,
-          background: pack.highlight ? '#faf9ff' : t.color.bgPage,
+          background: pack.highlight ? t.color.accentSurface : t.color.bgPage,
           boxShadow: pack.highlight ? '0 4px 24px rgba(99,85,224,0.12)' : 'none',
           display: 'flex', flexDirection: 'column', gap: 12,
           position: 'relative',

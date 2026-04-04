@@ -53,7 +53,7 @@ export function CreditsDisplay({ refetchKey }: Props) {
         display: 'flex', alignItems: 'center', gap: 5,
         padding: '5px 12px', borderRadius: 20,
         border: `1.5px solid ${low ? t.color.dangerBorder : t.color.border}`,
-        background: low ? '#fff1f2' : t.color.bgCard,
+        background: low ? t.color.dangerSubtle : t.color.bgCard,
         color: low ? t.color.danger : t.color.textStrong,
         fontSize: t.font.size.md, fontWeight: t.font.weight.medium, cursor: 'pointer',
         transition: 'all 0.15s',
