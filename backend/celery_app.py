@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 from celery import Celery
+from celery.schedules import crontab
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
@@ -12,7 +13,7 @@ celery_app = Celery(
     "noosphere",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["backend.tasks"],
+    include=["backend.tasks", "backend.cloud.tasks"],
 )
 
 celery_app.conf.update(
@@ -26,4 +27,10 @@ celery_app.conf.update(
     task_acks_on_failure_or_timeout=True,
     task_reject_on_worker_lost=False,
     task_track_started=True,
+    beat_schedule={
+        "expire-stale-subscription-credits": {
+            "task": "backend.cloud.tasks.expire_stale_subscription_credits",
+            "schedule": crontab(hour=0, minute=5),
+        },
+    },
 )
