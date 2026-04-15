@@ -879,52 +879,6 @@ async def decide_action(
             action_dist = ", ".join(f"{k}({v})" for k, v in action_counts.most_common())
             diversity_hint = f" Distribution so far: {action_dist}."
 
-    # Sentiment diversity hint: nudge away from monotone sentiment
-    _sentiment_diversity_hint = ""
-    if persona_history:
-        _sent_counts = Counter(
-            (getattr(p, 'sentiment', '') or 'neutral') for p in persona_history
-        )
-        _sent_summary = ", ".join(f"{s}:{c}" for s, c in _sent_counts.most_common())
-        if _sent_counts:
-            _top_sent, _top_cnt = _sent_counts.most_common(1)[0]
-            if _top_cnt >= 3:
-                _sentiment_diversity_hint = (
-                    f" Your recent outputs lean heavily {_top_sent}"
-                    f" -- consider a contrasting perspective this round."
-                )
-            elif _sent_summary:
-                _sentiment_diversity_hint = f" Sentiment balance so far: {_sent_summary}."
-
-    # Attitude-action alignment hint
-    attitude = getattr(persona, "attitude_shift", 0.0) or 0.0
-    if attitude >= 0.2:
-        attitude_action_hint = "Given your increasingly positive attitude, prefer constructive actions (comment, share_experience) over critical ones (downvote, flag).\n"
-    elif attitude <= -0.2:
-        attitude_action_hint = "Given your increasing skepticism, prefer critical engagement (reply with counterargument, pointed questions) over passive approval (upvote, react).\n"
-    else:
-        attitude_action_hint = ""
-
-    # Social proof hint: highlight the most-upvoted post, shaped by persona traits
-    social_proof_hint = ""
-    _feed_entries = re.findall(r"\[([^\]]+)\]\s+@\S+\s+\([^,]+,\s*\+(\d+),", feed_text)
-    if _feed_entries:
-        _top_id, _top_up_str = max(_feed_entries, key=lambda x: int(x[1]))
-        _top_upvotes = int(_top_up_str)
-        if _top_upvotes > 0:
-            _skep = getattr(persona, "skepticism", 5) or 5
-            _inno = getattr(persona, "innovation_openness", 5) or 5
-            # skepticism takes priority as a stronger signal
-            if _skep >= 7:
-                social_proof_hint = (
-                    f"[Social Signal] Post {_top_id[:8]} is heavily upvoted ({_top_upvotes}), "
-                    f"but popularity ≠ correctness. You tend to question consensus.\n"
-                )
-            elif _inno >= 7:
-                social_proof_hint = (
-                    f"[Social Signal] Post {_top_id[:8]} has the most upvotes ({_top_upvotes}) "
-                    f"— it reflects community interest. Consider engaging with it.\n"
-                )
 
     prompt = (
         f"Platform: {platform.name}\n"
@@ -939,10 +893,8 @@ async def decide_action(
         + f"Note: You are a community member reacting to someone else's product idea. You are NOT the creator.\n"
         f"Allowed actions:\n{action_list_lines}\n\n"
         f"{content_bias}"
-        f"Vary your action type.{diversity_hint}{_sentiment_diversity_hint}\n"
+        f"Vary your action type.{diversity_hint}\n"
         f"{phase_action_hint}"
-        f"{attitude_action_hint}"
-        f"{social_proof_hint}"
         f"{feed_text}\n\n"
         f"Choose one action from {allowed}. "
         f"For vote/react actions, pick a target_post_id from the feed. "
@@ -979,69 +931,10 @@ async def decide_action(
         return AgentAction(action_type=_fallback, target_post_id=f"__seed__{platform.name}")
 
 
-_NEGATIVE_KEYWORDS = {
-    # 극단적 부정
-    "terrible", "awful", "waste", "useless", "scam", "fraud", "horrible", "worst", "garbage", "nonsense",
-    # 일반적 비판/우려
-    "concern", "worried", "worry", "doubt", "skeptical", "skepticism", "problem", "issue",
-    "challenge", "difficult", "risky", "risk", "unclear", "question", "disagree",
-    "won't work", "doesn't work", "won't", "fail", "failure", "flaw", "flawed",
-    "overpriced", "expensive", "misleading", "overhyped", "hype", "crowded", "saturated",
-    "already exists", "nothing new", "not sure", "not convinced",
-}
-_POSITIVE_KEYWORDS = {
-    # 강한 긍정
-    "love", "amazing", "great", "revolutionary", "excellent", "brilliant", "outstanding",
-    "fantastic", "perfect", "innovative", "excited", "exciting",
-    # 일반적 긍정
-    "impressive", "promising", "valuable", "useful", "helpful", "solid", "strong",
-    "well done", "congratulations", "love this", "game changer", "game-changer",
-    "absolutely", "definitely", "highly recommend",
-}
-# 긍정 선언을 중립으로 낮추는 헤징 표현
-_HEDGE_KEYWORDS = {
-    "but", "however", "although", "though", "yet", "still", "unless",
-    "concern", "worry", "worried", "doubt", "unclear", "might", "maybe",
-    "could", "not sure", "question", "issue", "problem", "challenge",
-    "if", "depends", "need to", "needs to", "should", "have to",
-}
-
-
-def _validate_sentiment(content: str, declared: str, skepticism: int = 5) -> str:
-    """키워드 기반으로 LLM 선언 sentiment의 명백한 오류를 교정."""
-    lower = content.lower()
-    neg_count = sum(1 for w in _NEGATIVE_KEYWORDS if w in lower)
-    pos_count = sum(1 for w in _POSITIVE_KEYWORDS if w in lower)
-    hedge_count = sum(1 for w in _HEDGE_KEYWORDS if w in lower)
-
-    # constructive with ANY negative/hedge keywords → negative
-    if declared == "constructive" and (neg_count >= 1 or hedge_count >= 2):
-        return "negative"
-    # constructive for high-skepticism agents → always negative
-    if declared == "constructive" and skepticism >= 7:
-        return "negative"
-
-    # positive with clear negative signal → negative
-    if declared == "positive" and neg_count >= 2 and pos_count == 0:
-        return "negative"
-    # positive with hedging + no strong positive → neutral
-    if declared == "positive" and hedge_count >= 2 and pos_count == 0:
-        return "neutral"
-    # positive with mixed signals (both neg and hedge, weak pos) → neutral
-    if declared == "positive" and (neg_count >= 1 or hedge_count >= 3) and pos_count <= 1:
-        return "neutral"
-    # high-skepticism agents: positive → neutral unless strongly positive
-    if declared == "positive" and skepticism >= 7 and pos_count <= 1:
-        return "neutral"
-
-    # negative with strong positive and no negative → positive
-    if declared == "negative" and pos_count >= 2 and neg_count == 0 and hedge_count == 0:
-        return "positive"
-
+def _validate_sentiment(declared: str) -> str:
+    """LLM이 선언한 sentiment가 허용된 값인지만 확인."""
     _ACCEPTED = {"positive", "neutral", "negative", "constructive"}
-    if declared not in _ACCEPTED:
-        return "neutral"
-    return declared
+    return declared if declared in _ACCEPTED else "neutral"
 
 
 # ── 콘텐츠 생성 ───────────────────────────────────────────────────────────────
@@ -1169,35 +1062,6 @@ async def generate_content(
         )
         _conflicting_limit = 0
 
-    # Bandwagon Effect hint (Phase 3 only)
-    bandwagon_hint = ""
-    if phase_ratio > 0.66 and state and state.posts:
-        current_round_posts = [p for p in state.posts if p.round_num == round_num]
-        if current_round_posts:
-            from collections import Counter as _Counter
-            sent_counts = _Counter(p.sentiment or 'neutral' for p in current_round_posts if p.sentiment)
-            total_s = sum(sent_counts.values()) or 1
-            if sent_counts:
-                dom_sent, dom_count = sent_counts.most_common(1)[0]
-                dom_ratio = dom_count / total_s
-                if dom_ratio >= 0.55:
-                    persona_skepticism = getattr(persona, 'skepticism', 5) or 5
-                    attitude = getattr(persona, 'attitude_shift', 0.0) or 0.0
-                    _pos_sents = {'positive', 'constructive'}
-                    persona_is_positive = attitude >= 0
-                    dom_is_positive = dom_sent in _pos_sents
-
-                    if persona_skepticism <= 6 and persona_is_positive == dom_is_positive:
-                        bandwagon_hint = (
-                            f"[Social Momentum] {dom_ratio:.0%} of this round's posts are {dom_sent}. "
-                            f"As someone aligned with this sentiment, consider amplifying the consensus "
-                            f"with your own specific experience or data point."
-                        )
-                    elif persona_skepticism >= 7:
-                        bandwagon_hint = (
-                            f"[Contrarian Signal] {dom_ratio:.0%} of posts are {dom_sent} — groupthink is forming. "
-                            f"Point out what the majority might be overlooking."
-                        )
 
     # Build conflicting opinions section to encourage debate
     conflicting_section = ""
@@ -1240,20 +1104,6 @@ async def generate_content(
             for cp in conflicting_posts:
                 conflicting_section += f"- {cp.author_name}: {cp.content[:200]}\n"
             conflicting_section += "\n"
-        # Highlight positive posts for highly skeptical personas to provoke counter-arguments
-        # Skip in Phase 3 (synthesis) — debate escalation is no longer needed
-        if persona_skepticism >= 7 and phase_ratio <= 0.66:
-            positive_posts = [
-                p for p in state.posts
-                if getattr(p, "sentiment", "") == "positive"
-                and p.author_node_id != persona.node_id
-                and p.content.strip()
-            ][:2]
-            if positive_posts:
-                conflicting_section += "Posts you may want to challenge:\n"
-                for pp in positive_posts:
-                    conflicting_section += f"- {pp.author_name}: {pp.content[:200]}\n"
-                conflicting_section += "\n"
     # Build cross-platform context section
     if cross_platform_context:
         cross_section = (
@@ -1297,14 +1147,6 @@ async def generate_content(
                 if getattr(persona, "attitude_shift", 0.0) <= -0.2
                 else ""
             )
-        )
-        + (
-            "SENTIMENT GUIDANCE: Your skepticism is HIGH ({}/9). "
-            "Lean toward NEGATIVE or NEUTRAL sentiment. Only pick positive if the argument is genuinely compelling.\n".format(
-                getattr(persona, "skepticism", 5) or 5
-            )
-            if (getattr(persona, "skepticism", 5) or 5) >= 7
-            else ""
         )
         + f"Action: {action.action_type}"
         + (f" (replying to post {action.target_post_id})" if action.target_post_id else "") + "\n\n"
@@ -1350,8 +1192,6 @@ async def generate_content(
     # [OPTIONAL] 섹션 — 공간 부족 시 먼저 제거
     if phase_hint:
         _sections.append(("[OPTIONAL]", phase_hint))
-    if bandwagon_hint:
-        _sections.append(("[OPTIONAL]", f"\n{bandwagon_hint}"))
     # feed_text는 항상 [MUST READ]
     _sections.append(("[MUST READ]", f"\n{feed_text}\n\n"))
 
@@ -1777,18 +1617,6 @@ async def platform_round(
                 persona_history = [p for p in state.posts if p.author_node_id == persona.node_id]
                 # Late Joiner 감지: 3라운드 이후 첫 참여
                 is_first_participation = (len(persona_history) == 0 and round_num >= 3)
-                # Sentiment fatigue hint: 동일 sentiment 3회 이상 연속 시 다양성 유도
-                sentiment_fatigue_hint = ""
-                if len(persona_history) >= 3:
-                    recent_sentiments = [p.sentiment for p in persona_history[-3:] if p.sentiment]
-                    if len(recent_sentiments) == 3 and len(set(recent_sentiments)) == 1:
-                        repeated = recent_sentiments[0]
-                        sentiment_fatigue_hint = (
-                            f"[Perspective Check] You've expressed '{repeated}' sentiment 3 times in a row. "
-                            f"Real people naturally introduce nuance -- consider a different angle or acknowledging counterpoints."
-                        )
-                if sentiment_fatigue_hint:
-                    feed_text = feed_text + "\n" + sentiment_fatigue_hint
                 my_post_ids = {p.id for p in persona_history}
 
                 # attitude shift 계산용: 마지막 활성화 이후 새로운 리플라이만 (이중 카운팅 방지)
@@ -2109,8 +1937,7 @@ async def platform_round(
 
                     # new_post actions are always top-level (no parent)
                     effective_parent_id = None if content_action.action_type == "new_post" else content_action.target_post_id
-                    _persona_skep = getattr(persona, "skepticism", 5) or 5
-                    validated_sentiment = _validate_sentiment(content, structured_data.get("sentiment", "neutral"), skepticism=_persona_skep)
+                    validated_sentiment = _validate_sentiment(structured_data.get("sentiment", "neutral"))
                     post = SocialPost(
                         id=str(uuid.uuid4()),
                         platform=platform.name,

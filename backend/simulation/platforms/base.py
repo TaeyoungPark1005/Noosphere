@@ -42,7 +42,7 @@ class AbstractPlatform:
                     "sentiment": {
                         "type": "string",
                         "enum": ["positive", "neutral", "negative", "constructive"],
-                        "description": "Tone toward the idea — positive: genuinely excited or fully supportive with ZERO reservations (use ONLY if you have no doubts); neutral: mixed, exploratory, or mildly interested; negative: any doubt, concern, criticism, or skepticism — DEFAULT for critical posts; constructive: ONLY if the entire response is an explicit numbered improvement list (extremely rare, <5%)",
+                        "description": "Tone toward the idea — positive: supportive, enthusiastic, or excited, even if you have minor questions or hope for improvements; neutral: balanced or mixed response, neither clearly for nor against; negative: critical, skeptical, or expressing significant concerns or clear opposition; constructive: specific actionable improvement suggestions (use only when your post is primarily concrete fixes or a numbered list of improvements)",
                     },
                 },
                 "required": ["text", "sentiment"],
